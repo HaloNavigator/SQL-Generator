@@ -1,0 +1,1655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Halo Navigators SQL Generator</title>
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .container-sql {
+            display: grid;
+            gap: 20px;
+            grid-template-columns: 1fr;
+        }
+        @media (min-width: 1024px) {
+            .container-sql {
+                grid-template-columns: 1fr 1fr 1.5fr;
+            }
+        }
+        .panel-sql {
+            background-color: #1a202c;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .schema-panel-sql {
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .table-list-sql {
+            list-style: none;
+            padding: 0;
+        }
+        .table-item-sql {
+            margin-bottom: 16px;
+            border: 1px solid #4a5568;
+            padding: 16px;
+            border-radius: 8px;
+        }
+        .table-header-controls-sql {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+        .table-header-controls-sql h3 {
+            margin: 0;
+            font-size: 1.25rem;
+            user-select: none;
+            color: #d1d5db;
+        }
+        .toggle-icon-sql {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-right: 8px;
+            user-select: none;
+            color: #00ff87;
+        }
+        .field-list-sql {
+            list-style: none;
+            padding-left: 20px;
+        }
+        .table-item-sql.collapsed .field-list-sql {
+            display: none;
+        }
+        .field-list-sql li {
+            margin-top: 5px;
+        }
+        .field-list-sql input[type="checkbox"] {
+            margin-right: 8px;
+            color: #00ff87;
+        }
+        textarea.sql-output {
+            width: 100%;
+            height: 250px;
+            padding: 16px;
+            border: 1px solid #4a5568;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 14px;
+            resize: vertical;
+            background-color: #2d3748;
+            color: #e2e8f0;
+        }
+        .select-all-sql {
+            font-size: 0.875rem;
+            cursor: pointer;
+            color: #00ff87;
+            margin-left: 10px;
+            user-select: none;
+        }
+        .query-panel-sql {
+            display: flex;
+            flex-direction: column;
+        }
+        #join-info-panel-sql, #where-panel-sql, #aggregate-panel-sql, #request-type-panel {
+            background-color: #2d3748;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border: 1px solid #4a5568;
+        }
+        #join-info-panel-sql h4, #where-panel-sql h4, #aggregate-panel-sql h4, #request-type-panel h4 {
+            margin-top: 0;
+            border-bottom: 1px solid #4a5568;
+            padding-bottom: 8px;
+            color: #cbd5e0;
+        }
+        #join-info-panel-sql ul {
+            list-style: none;
+            padding: 0;
+        }
+        #join-info-panel-sql li {
+            margin-bottom: 5px;
+            color: #a0aec0;
+        }
+        .join-direction-sql {
+            font-weight: bold;
+            color: #00ff87;
+        }
+        #custom-join-container-sql {
+            display: none;
+            margin-top: 16px;
+            padding: 16px;
+            border: 1px solid #4a5568;
+            border-radius: 8px;
+            background-color: #2d3748;
+        }
+        .copy-btn {
+            background: #00ff87;
+            color: #1a202c;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 9999px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            font-weight: bold;
+        }
+        .copy-btn:hover {
+            background-color: #00e67a;
+            transform: scale(1.05);
+        }
+        .clear-btn {
+            background-color: #264653;
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 9999px;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+        .clear-btn:hover {
+            transform: scale(1.05);
+            background-color: #2a6f8b;
+        }
+        .where-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .where-row select, .where-row input, .where-row .add-remove-btn {
+            padding: 8px;
+            border: 1px solid #4a5568;
+            border-radius: 4px;
+            background-color: #1a202c;
+            color: #e2e8f0;
+        }
+        .add-remove-btn {
+            background-color: #ef4444;
+            color: white;
+            border: none;
+            cursor: pointer;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .add-remove-btn.add {
+            background-color: #00ff87;
+            color: #1a202c;
+        }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-200 p-8">
+
+    <main class="container mx-auto px-4">
+        <!-- SQL Query Generator Section -->
+        <section class="py-16 md:py-24">
+            <h1 class="text-3xl sm:text-4xl font-bold text-center mb-12" style="color: #00ff87;">Halo Navigators SQL Generator</h1>
+            <div class="container-sql mx-auto">
+                <!-- Left Column: Schema and Tables -->
+                <div class="panel-sql schema-panel-sql">
+                    <div class="flex items-center mb-4">
+                        <h2 class="text-xl font-bold text-gray-200">Select Tables and Fields</h2>
+                        <button id="toggle-all-btn" class="ml-4 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-full transition-colors duration-300">
+                            Expand All
+                        </button>
+                    </div>
+                    <div id="custom-join-container-sql">
+                        <p class="text-gray-400 mb-2">Define a custom JOIN condition:</p>
+                        <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-2">
+                            <select id="custom-join-table1" class="w-full sm:w-auto p-2 rounded-md bg-gray-700 text-gray-200 border border-gray-600"></select>
+                            <span class="text-gray-400">JOIN</span>
+                            <select id="custom-join-table2" class="w-full sm:w-auto p-2 rounded-md bg-gray-700 text-gray-200 border border-gray-600"></select>
+                            <span class="text-gray-400">ON</span>
+                            <input type="text" id="custom-join-condition" class="flex-1 p-2 rounded-md bg-gray-700 text-gray-200 border border-gray-600" placeholder="e.g., [Table1].[Column] = [Table2].[Column]">
+                            <button id="add-join-btn" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-2 px-4 rounded-full transition-all duration-300">
+                                Add Join
+                            </button>
+                        </div>
+                    </div>
+                    <div id="schema-container-sql" class="mt-4"></div>
+                </div>
+
+                <!-- Middle Column: Filters and Aggregates -->
+                <div class="flex flex-col space-y-4">
+                    <div class="panel-sql" id="request-type-panel">
+                        <h4 class="text-lg font-bold">Filter by Request Type</h4>
+                        <div id="request-type-control-container" class="mt-4">
+                            <!-- This will be dynamically populated -->
+                        </div>
+                    </div>
+                    
+                    <div class="panel-sql" id="where-panel-sql">
+                        <h4 class="text-lg font-bold">WHERE Clause</h4>
+                        <p class="text-xs text-gray-400 mb-2 italic">Note: Query always includes `WHERE [Faults].[fdeleted] = 0`</p>
+                        <div id="where-conditions-container"></div>
+                        <button id="add-where-btn" class="mt-4 bg-[#00ff87] hover:bg-[#00e67a] text-gray-900 font-semibold py-2 px-4 rounded-full transition-colors duration-300">
+                            Add Condition
+                        </button>
+                    </div>
+
+                    <div class="panel-sql" id="aggregate-panel-sql">
+                        <h4 class="text-lg font-bold">Aggregate Functions & GROUP BY</h4>
+                        <div class="mb-4">
+                            <label for="group-by-select" class="block text-sm font-medium text-gray-400 mb-1">GROUP BY:</label>
+                            <select id="group-by-select" multiple class="mt-1 block w-full p-2 rounded-md bg-gray-700 text-gray-200 border border-gray-600"></select>
+                        </div>
+                        <div class="mb-4">
+                            <label for="aggregate-select" class="block text-sm font-medium text-gray-400 mb-1">Aggregate Function:</label>
+                            <div class="flex space-x-2">
+                                <select id="aggregate-function" class="p-2 rounded-md bg-gray-700 text-gray-200 border border-gray-600">
+                                    <option value="">-- Select Function --</option>
+                                    <option value="COUNT">COUNT</option>
+                                    <option value="SUM">SUM</option>
+                                    <option value="AVG">AVG</option>
+                                    <option value="MAX">MAX</option>
+                                    <option value="MIN">MIN</option>
+                                </select>
+                                <select id="aggregate-column" class="flex-1 p-2 rounded-md bg-gray-700 text-gray-200 border border-gray-600">
+                                    <option value="">-- Select Column --</option>
+                                </select>
+                                <button id="add-aggregate-btn" class="mt-4 bg-[#00ff87] hover:bg-[#00e67a] text-gray-900 font-semibold py-2 px-4 rounded-full transition-colors duration-300">Add</button>
+                            </div>
+                        </div>
+                        <div id="selected-aggregates" class="mt-4">
+                            <h5 class="text-gray-400">Selected Aggregates:</h5>
+                            <ul id="aggregate-list" class="list-disc list-inside text-sm text-gray-300"></ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Query Output and Joins -->
+                <div class="flex flex-col space-y-4">
+                    <div class="panel-sql query-panel-sql">
+                        <h2 class="text-xl font-bold text-gray-200 mb-4">Generated SQL Query</h2>
+                        <textarea id="query-output-sql" class="sql-output" readonly></textarea>
+                        <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 mt-4">
+                            <button id="copy-btn-sql" class="copy-btn">
+                                Copy to Clipboard
+                            </button>
+                            <button id="clear-btn-sql" class="clear-btn">
+                                Clear Query
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="panel-sql" id="join-info-panel-sql">
+                        <h4 class="text-lg font-bold">Possible Joins</h4>
+                        <p>Select fields to see possible joins.</p>
+                        <ul id="join-list"></ul>
+                        <button id="custom-join-btn" class="mt-4 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-full transition-colors duration-300">
+                            Add Custom Join
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+    <script>
+        const schemaString = `
+            CREATE TABLE [Faults] (
+              [Faultid] int PRIMARY KEY,
+              [Username] nvarchar,
+              [UserID] int,
+              [PhoneNumber] nvarchar,
+              [Symptom] nvarchar,
+              [Status] int,
+              [Seriousness] int,
+              [DateOccured] datetime,
+              [SiteNumber] int,
+              [Areaint] int,
+              [Sectio_] nvarchar,
+              [RequestTypeNew] int,
+              [FServiceid] int,
+              [ShowOnWeb] bool,
+              [SLAID] int,
+              [SLAState] nvarchar,
+              [DeviceNumber] int,
+              [DevSite] int,
+              [FixByDate] datetime,
+              [ClearTime] float,
+              [Clearance] ntext,
+              [DateCleared] datetime,
+              [AssignedToInt] int,
+              [ClearWhoInt] int,
+              [Category2] nvarchar,
+              [Category3] nvarchar,
+              [Category4] nvarchar,
+              [Category5] nvarchar,
+              [FFlowID] int,
+              [Supplier] int,
+              [CF_Custom_FieldName] nvarchar,
+              [fdeleted] bit
+            )
+            GO
+
+            CREATE TABLE [FaultsCustom1] (
+              [PKid] int PRIMARY KEY,
+              [CFFieldName] Nvarchar(255)
+            )
+            GO
+
+            CREATE TABLE [Users] (
+              [uid] int PRIMARY KEY,
+              [Usite] int,
+              [UUsername] nvarchar(255),
+              [Uextn] nvarchar(30),
+              [UMobile] nvarchar(30),
+              [UEmail] nvarchar(255),
+              [UNotes] ntext,
+              [ULogin] nvarchar(30),
+              [UInactive] bool
+            )
+            GO
+
+            CREATE TABLE [Site] (
+              [SSitenum] int PRIMARY KEY,
+              [SIsInactive] bool,
+              [STimezoneName] nvarchar(255),
+              [SMemo] ntext,
+              [SArea] int,
+              [SDesc] nvarchar(255)
+            )
+            GO
+
+            CREATE TABLE [StockLocation] (
+              [SCid] int PRIMARY KEY,
+              [SCDesc] nvarchar(255)
+            )
+            GO
+
+            CREATE TABLE [StockLevel] (
+              [SLid] int PRIMARY KEY,
+              [SLlocation] int,
+              [SLqtyinstock] float
+            )
+            GO
+
+            CREATE TABLE [StockBin] (
+              [STBid] int PRIMARY KEY,
+              [STBSsitenum] int,
+              [STBName] Nvarchar(255)
+            )
+            GO
+
+            CREATE TABLE [item] (
+              [iid] int PRIMARY KEY,
+              [IGeneric] int,
+              [Inote] ntext,
+              [iDesc] nvarchar(255),
+              [idesc2] nvarchar,
+              [idesc3] nvarchar,
+              [IBaseprice] money,
+              [ICostPrice] money,
+              [ISupplier] int,
+              [Itypenum] int,
+              [IIsRecurringItem] bit,
+              [IRecurringPrice] float,
+              [Itaxcode] int,
+              [ITaxCodeOther] int
+            )
+            GO
+
+            CREATE TABLE [Area] (
+              [AArea] int PRIMARY KEY,
+              [AAreaDesc] nvarchar(255),
+              [AMemo] ntext,
+              [ATechNote] ntext,
+              [AtreeID] int,
+              [AIsInactive] bool
+            )
+            GO
+
+            CREATE TABLE [Tree] (
+              [TreeID] int PRIMARY KEY,
+              [TreeDesc] nvarchar(40)
+            )
+            GO
+
+            CREATE TABLE [Sectiondetail] (
+              [SDid] int PRIMARY KEY,
+              [SDSectionName] nvarchar(255),
+              [SDDepartmentid] int,
+              [SDInactive] bool
+            )
+            GO
+
+            CREATE TABLE [Uname] (
+              [UNum] int PRIMARY KEY,
+              [UName] nvarchar(255),
+              [USection] nvarchar(255),
+              [USMTP] nvarchar(255),
+              [USMS] nvarchar(50),
+              [UAD] nvarchar(50),
+              [UIsDisabled] bool,
+              [UJobTitle] nvarchar(50)
+            )
+            GO
+
+            CREATE TABLE [actions] (
+              [Faultid] int,
+              [ActionNumber] int,
+              [ActOutcome] nvarchar(255),
+              [Who] nvarchar(255),
+              [Whe_] datetime,
+              [Note] ntext,
+              [TimeTaken] float,
+              [DateEmailed] datetime,
+              [EmailBody] ntext,
+              [ActionHide] bool,
+              [nonbilltime] float,
+              [TravelTime] float,
+              PRIMARY KEY ([Faultid], [ActionNumber])
+            )
+            GO
+
+            CREATE TABLE [RequestType] (
+              [RTID] int PRIMARY KEY,
+              [RTDesc] nvarchar(255)
+            )
+            GO
+
+            CREATE TABLE [Device] (
+              [DDevNum] int,
+              [DSite] int,
+              [DInvNo] nvarchar(255),
+              [DID] nvarchar(255),
+              [DType] int,
+              [DCompanyNum] int,
+              [DWarrantyStartDate] datetime,
+              [DWarrantyEndDate] datetime,
+              [DLabourWarrantyStartDate] datetime,
+              [DLabourWarrantyEndDate] datetime,
+              [Did] int,
+              PRIMARY KEY ([DDevNum], [DSite])
+            )
+            GO
+
+            CREATE TABLE [UserDevice] (
+              [UDsite] int,
+              [UDusername] int,
+              [UDdevsite] nvarchar(255),
+              [UDdevnum] nvarchar(255),
+              PRIMARY KEY ([UDsite], [UDusername])
+            )
+            GO
+
+            CREATE TABLE [DeviceInfo] (
+              [inum] int,
+              [iseq] int,
+              [idata] nvarchar(255)
+            )
+            GO
+
+            CREATE TABLE [TypeInfo] (
+              [xnum] int,
+              [xseq] int,
+              [xfieldnos] int
+            )
+            GO
+
+            CREATE TABLE [field] (
+              [yseq] int PRIMARY KEY,
+              [yname] nvarchar(255),
+              [ykind] nvarchar(255)
+            )
+            GO
+
+            CREATE TABLE [XType] (
+              [TTypeNum] int PRIMARY KEY,
+              [TDesc] nvarchar(255),
+              [TGeneric] int,
+              [Tallowallstatus] bit
+            )
+            GO
+
+            CREATE TABLE [XTypeStatus] (
+              [xtsid] int PRIMARY KEY,
+              [xtsttypenum] int,
+              [xtsdstatus] int,
+              [xtsallowafterallstatuses] bit
+            )
+            GO
+
+            CREATE TABLE [XTypeStatusRestrictions] (
+              [xtsrxtsid] int PRIMARY KEY,
+              [xtsrdstatus] int
+            )
+            GO
+
+            CREATE TABLE [Generic] (
+              [GGeneric] int PRIMARY KEY,
+              [GDesc] nvarchar(255)
+            )
+            GO
+
+            CREATE TABLE [TStatus] (
+              [TStatus] int PRIMARY KEY,
+              [TStatusDesc] nvarchar(255)
+            )
+            GO
+
+            CREATE TABLE [SLAHead] (
+              [SLID] int PRIMARY KEY,
+              [SLDesc] nvarchar(255)
+            )
+            GO
+
+            CREATE TABLE [Policy] (
+              [PPolicy] int PRIMARY KEY,
+              [PSLAID] int,
+              [PDesc] nvarchar(30),
+              [PTime] float,
+              [PUnits] nvarchar(1),
+              [PResponseTime] float,
+              [PResponseUnits] nvarchar(1)
+            )
+            GO
+
+            CREATE TABLE [Company] (
+              [CNum] int PRIMARY KEY,
+              [CDesc] nvarchar(255),
+              [CTree] int,
+              [CIsInactive] bool,
+              [cphone1] nvarchar,
+              [Caddress] ntext,
+              [Cemailaddress] nvarchar
+            )
+            GO
+
+            CREATE TABLE [Servsite] (
+              [STid] int PRIMARY KEY,
+              [STDesc] nvarchar(255),
+              [STSvcid] int,
+              [STSummary] nvarchar(255),
+              [STIncidentrtid] int
+            )
+            GO
+
+            CREATE TABLE [ServiceCategory] (
+              [Svcid] int PRIMARY KEY,
+              [SvcDesc] nvarchar(255)
+            )
+            GO
+
+            CREATE TABLE [ServiceRequestDetails] (
+              [SRDstid] int PRIMARY KEY,
+              [SRDServiceRequestLbl] nvarchar(255),
+              [SRDServicertid] int,
+              [SRDTemplateid] int
+            )
+            GO
+
+            CREATE TABLE [FlowHeader] (
+              [FHid] int PRIMARY KEY,
+              [FHName] nvarchar(255)
+            )
+            GO
+
+            CREATE TABLE [FlowStages] (
+              [FsFhid] int,
+              [FsSeq] int PRIMARY KEY,
+              [FsDesc] nvarchar(255)
+            )
+            GO
+
+            CREATE TABLE [FaultApproval] (
+              [FAid] int PRIMARY KEY,
+              [FAApid] int,
+              [FAResult] int,
+              [fadatetime] datetime,
+              [FANote] nvarchar(4000)
+            )
+            GO
+
+            CREATE TABLE [ApprovalProcess] (
+              [APid] int PRIMARY KEY,
+              [APDesc] int
+            )
+            GO
+
+            CREATE TABLE [Contract] (
+              [CNCompanyNum] int,
+              [CNid] int PRIMARY KEY,
+              [CNContractCode] int,
+              [CNStartDate] datetime,
+              [CNEndDate] datetime,
+              [CNContractDesc] nvarchar(255),
+              [CNActive] bool,
+              [cnphone1] nvarchar(4000),
+              [cnphone2] nvarchar(4000),
+              [cnphone3] nvarchar(4000)
+            )
+            GO
+
+            CREATE TABLE [FAQClient] (
+              [FAQCid] int PRIMARY KEY,
+              [FAQCArea] int
+            )
+            GO
+
+            CREATE TABLE [FAQSite] (
+              [FAQSid] int PRIMARY KEY,
+              [FAQSSiteid] int
+            )
+            GO
+
+            CREATE TABLE [FAQListHead] (
+              [FAQid] int PRIMARY KEY,
+              [FAQListDesc] int,
+              [FAQAvailableToAll] bool,
+              [FAQLevel] int,
+              [FAQLevelFAQid] int
+            )
+            GO
+
+            CREATE TABLE [FAQListDet] (
+              [FAQDid] int PRIMARY KEY,
+              [FAQDkbid] int
+            )
+            GO
+
+            CREATE TABLE [KBEntry] (
+              [id] int PRIMARY KEY,
+              [Abstract] nvarchar(255),
+              [Description] nvarchar(4000),
+              [Resolution] nvarchar(4000),
+              [Whocreated] int
+            )
+            GO
+
+            CREATE TABLE [Feedback] (
+              [FBFaultid] int PRIMARY KEY,
+              [FBUsername] nvarchar(255),
+              [FBScore] int,
+              [FBDate] datetime,
+              [FBComment] nvarchar(255)
+            )
+            GO
+
+            CREATE TABLE [ResourceTimeLog] (
+              [RTLFaultid] int PRIMARY KEY,
+              [RTLSection] nvarchar(40),
+              [RTLUnum] int
+            )
+            GO
+
+            CREATE TABLE [STDRequest] (
+              [STDid] int PRIMARY KEY,
+              [StdName] nvarchar(255),
+              [STDType] int,
+              [STDRequestTypeDef] int,
+              [STDAssignedToInt] int,
+              [stdsymptom] ntext(1073741823)
+            )
+            GO
+
+            CREATE TABLE [InvoiceHeader] (
+              [ihid] int PRIMARY KEY,
+              [IHaarea] int,
+              [IHsitenumber] int,
+              [IHuid] int,
+              [IH3rdPartyInvoiceNumber] nvarchar,
+              [IHname] nvarchar,
+              [IHAddress1] nvarchar
+            )
+            GO
+            
+            CREATE TABLE [JOURNEY] (
+              [JID] int PRIMARY KEY,
+              [JOFaultid] int,
+              [JONum] int,
+              [JODate] datetime,
+              [JONotes] ntext
+            )
+            GO
+
+            CREATE TABLE [InvoicePayment] (
+              [IPID] int PRIMARY KEY,
+              [IPIHid] int,
+              [IPAmount] money
+            )
+            GO
+
+            CREATE TABLE [ViewLog] (
+              [VLid] int PRIMARY KEY,
+              [VLagentid] int,
+              [VLdatetime] datetime
+            )
+            GO
+
+            CREATE TABLE [RoundRobinLog] (
+              [RRLID] int PRIMARY KEY,
+              [RRLfaultid] int,
+              [RRLagent_id] int
+            )
+            GO
+
+            CREATE TABLE [Licence] (
+              [Lid] int PRIMARY KEY,
+              [LArea] int
+            )
+            GO
+
+            CREATE TABLE [FaultsCustomX] (
+              [pkid] int PRIMARY KEY,
+              [CFXFieldName] nvarchar(255)
+            )
+            GO
+
+            CREATE TABLE [QUOTATIONDETAIL] (
+              [QDid] int PRIMARY KEY,
+              [QDline] int
+            )
+            GO
+
+            CREATE TABLE [CategoryDetail] (
+              [CDid] int PRIMARY KEY,
+              [CDCategoryName] nvarchar,
+              [cdgroup] nvarchar
+            )
+            GO
+
+            CREATE TABLE [Lookup] (
+              [Lid] int PRIMARY KEY,
+              [fcode] nvarchar
+            )
+            GO
+
+            CREATE TABLE [RelatedItems] (
+              [RIid] int PRIMARY KEY,
+              [RIparentid] int,
+              [RIchildid] int
+            )
+            GO
+            
+            ALTER TABLE [Faults] ADD FOREIGN KEY ([UserID]) REFERENCES [Users] ([uid])
+            GO
+
+            ALTER TABLE [Faults] ADD FOREIGN KEY ([SiteNumber]) REFERENCES [Site] ([SSitenum])
+            GO
+
+            ALTER TABLE [Faults] ADD FOREIGN KEY ([Areaint]) REFERENCES [Area] ([AArea])
+            GO
+
+            ALTER TABLE [Faults] ADD FOREIGN KEY ([RequestTypeNew]) REFERENCES [RequestType] ([RTID])
+            GO
+
+            ALTER TABLE [Faults] ADD FOREIGN KEY ([AssignedToInt]) REFERENCES [Uname] ([UNum])
+            GO
+
+            ALTER TABLE [Faults] ADD FOREIGN KEY ([ClearWhoInt]) REFERENCES [Uname] ([UNum])
+            GO
+
+
+
+            ALTER TABLE [Faults] ADD FOREIGN KEY ([SLAID]) REFERENCES [SLAHead] ([SLID])
+            GO
+
+            ALTER TABLE [Faults] ADD FOREIGN KEY ([DeviceNumber], [DevSite]) REFERENCES [Device] ([DDevNum], [DSite])
+            GO
+
+            ALTER TABLE [Faults] ADD FOREIGN KEY ([FFlowID]) REFERENCES [FlowHeader] ([FHid])
+            GO
+
+            ALTER TABLE [Users] ADD FOREIGN KEY ([Usite]) REFERENCES [Site] ([SSitenum])
+            GO
+
+            ALTER TABLE [Site] ADD FOREIGN KEY ([SArea]) REFERENCES [Area] ([AArea])
+            GO
+
+            ALTER TABLE [StockLevel] ADD FOREIGN KEY ([SLlocation]) REFERENCES [StockLocation] ([SCid])
+            GO
+
+            ALTER TABLE [StockBin] ADD FOREIGN KEY ([STBSsitenum]) REFERENCES [Site] ([SSitenum])
+            GO
+
+            ALTER TABLE [item] ADD FOREIGN KEY ([ISupplier]) REFERENCES [Company] ([CNum])
+            GO
+
+            ALTER TABLE [item] ADD FOREIGN KEY ([Itypenum]) REFERENCES [XType] ([TTypeNum])
+            GO
+
+            ALTER TABLE [Area] ADD FOREIGN KEY ([AtreeID]) REFERENCES [Tree] ([TreeID])
+            GO
+
+            ALTER TABLE [Sectiondetail] ADD FOREIGN KEY ([SDDepartmentid]) REFERENCES [Area] ([AArea])
+            GO
+
+            ALTER TABLE [Uname] ADD FOREIGN KEY ([USection]) REFERENCES [Sectiondetail] ([SDSectionName])
+            GO
+
+            ALTER TABLE [actions] ADD FOREIGN KEY ([Faultid]) REFERENCES [Faults] ([Faultid])
+            GO
+
+            ALTER TABLE [RequestType] ADD FOREIGN KEY ([RTID]) REFERENCES [Servsite] ([STIncidentrtid])
+            GO
+
+            ALTER TABLE [Device] ADD FOREIGN KEY ([DSite]) REFERENCES [Site] ([SSitenum])
+            GO
+
+            ALTER TABLE [Device] ADD FOREIGN KEY ([DType]) REFERENCES [XType] ([TTypeNum])
+            GO
+
+            ALTER TABLE [Device] ADD FOREIGN KEY ([DCompanyNum]) REFERENCES [Company] ([CNum])
+            GO
+
+            ALTER TABLE [UserDevice] ADD FOREIGN KEY ([UDsite]) REFERENCES [Site] ([SSitenum])
+            GO
+
+            ALTER TABLE [UserDevice] ADD FOREIGN KEY ([UDusername]) REFERENCES [Uname] ([UNum])
+            GO
+
+            ALTER TABLE [DeviceInfo] ADD FOREIGN KEY ([inum]) REFERENCES [Device] ([DDevNum])
+            GO
+
+            ALTER TABLE [DeviceInfo] ADD FOREIGN KEY ([iseq]) REFERENCES [TypeInfo] ([xseq])
+            GO
+
+            ALTER TABLE [DeviceInfo] ADD FOREIGN KEY ([xnum]) REFERENCES [TypeInfo] ([xnum])
+            GO
+
+            ALTER TABLE [TypeInfo] ADD FOREIGN KEY ([xfieldnos]) REFERENCES [field] ([yseq])
+            GO
+
+            ALTER TABLE [XTypeStatus] ADD FOREIGN KEY ([xtsttypenum]) REFERENCES [XType] ([TTypeNum])
+            GO
+
+            ALTER TABLE [XTypeStatus] ADD FOREIGN KEY ([xtsdstatus]) REFERENCES [TStatus] ([TStatus])
+            GO
+
+            ALTER TABLE [XTypeStatusRestrictions] ADD FOREIGN KEY ([xtsrxtsid]) REFERENCES [XTypeStatus] ([xtsid])
+            GO
+
+            ALTER TABLE [XTypeStatusRestrictions] ADD FOREIGN KEY ([xtsrdstatus]) REFERENCES [TStatus] ([TStatus])
+            GO
+
+            ALTER TABLE [SLAHead] ADD FOREIGN KEY ([SLID]) REFERENCES [Policy] ([PSLAID])
+            GO
+
+            ALTER TABLE [Company] ADD FOREIGN KEY ([CTree]) REFERENCES [Tree] ([TreeID])
+            GO
+
+            ALTER TABLE [Servsite] ADD FOREIGN KEY ([STSvcid]) REFERENCES [ServiceCategory] ([Svcid])
+            GO
+
+            ALTER TABLE [ServiceRequestDetails] ADD FOREIGN KEY ([SRDstid]) REFERENCES [Servsite] ([STid])
+            GO
+
+
+
+            ALTER TABLE [ServiceRequestDetails] ADD FOREIGN KEY ([SRDServicertid]) REFERENCES [RequestType] ([RTID])
+            GO
+
+            ALTER TABLE [FlowHeader] ADD FOREIGN KEY ([FHid]) REFERENCES [FlowStages] ([FsFhid])
+            GO
+
+            ALTER TABLE [FlowStages] ADD FOREIGN KEY ([FsFhid]) REFERENCES [FlowHeader] ([FHid])
+            GO
+
+            ALTER TABLE [FaultApproval] ADD FOREIGN KEY ([FAid]) REFERENCES [ApprovalProcess] ([APid])
+            GO
+
+            ALTER TABLE [ApprovalProcess] ADD FOREIGN KEY ([APid]) REFERENCES [FaultApproval] ([APid])
+            GO
+
+            ALTER TABLE [Contract] ADD FOREIGN KEY ([CNCompanyNum]) REFERENCES [Company] ([CNum])
+            GO
+
+            ALTER TABLE [FAQClient] ADD FOREIGN KEY ([FAQCArea]) REFERENCES [Area] ([AArea])
+            GO
+
+            ALTER TABLE [FAQSite] ADD FOREIGN KEY ([FAQSid]) REFERENCES [Site] ([SSitenum])
+            GO
+
+            ALTER TABLE [FAQListHead] ADD FOREIGN KEY ([FAQLevelFAQid]) REFERENCES [FAQListHead] ([FAQid])
+            GO
+
+            ALTER TABLE [FAQListDet] ADD FOREIGN KEY ([FAQDid]) REFERENCES [FAQListHead] ([FAQid])
+            GO
+
+            ALTER TABLE [FAQListDet] ADD FOREIGN KEY ([FAQDkbid]) REFERENCES [KBEntry] ([id])
+            GO
+
+            ALTER TABLE [Feedback] ADD FOREIGN KEY ([FBFaultid]) REFERENCES [Faults] ([Faultid])
+            GO
+
+            ALTER TABLE [ResourceTimeLog] ADD FOREIGN KEY ([RTLFaultid]) REFERENCES [Faults] ([Faultid])
+            GO
+
+            ALTER TABLE [ResourceTimeLog] ADD FOREIGN KEY ([RTLUnum]) REFERENCES [Uname] ([UNum])
+            GO
+
+            ALTER TABLE [STDRequest] ADD FOREIGN KEY ([STDType]) REFERENCES [XType] ([TTypeNum])
+            GO
+
+            ALTER TABLE [STDRequest] ADD FOREIGN KEY ([STDRequestTypeDef]) REFERENCES [RequestType] ([RTID])
+            GO
+
+            ALTER TABLE [STDRequest] ADD FOREIGN KEY ([STDAssignedToInt]) REFERENCES [Uname] ([UNum])
+            GO
+
+            ALTER TABLE [InvoiceHeader] ADD FOREIGN KEY ([IHaarea]) REFERENCES [Area] ([AArea])
+            GO
+
+            ALTER TABLE [InvoiceHeader] ADD FOREIGN KEY ([IHsitenumber]) REFERENCES [Site] ([SSitenum])
+            GO
+
+            ALTER TABLE [InvoiceHeader] ADD FOREIGN KEY ([IHuid]) REFERENCES [Users] ([uid])
+            GO
+            
+            ALTER TABLE [JOURNEY] ADD FOREIGN KEY ([JOFaultid]) REFERENCES [Faults] ([Faultid])
+            GO
+
+            ALTER TABLE [InvoicePayment] ADD FOREIGN KEY ([IPIHid]) REFERENCES [InvoiceHeader] ([ihid])
+            GO
+
+            ALTER TABLE [ViewLog] ADD FOREIGN KEY ([VLagentid]) REFERENCES [Uname] ([UNum])
+            GO
+
+            ALTER TABLE [RoundRobinLog] ADD FOREIGN KEY ([RRLID]) REFERENCES [Faults] ([RRLfaultid])
+            GO
+
+            ALTER TABLE [RoundRobinLog] ADD FOREIGN KEY ([RRLagent_id]) REFERENCES [Uname] ([UNum])
+            GO
+
+            ALTER TABLE [Licence] ADD FOREIGN KEY ([LArea]) REFERENCES [Area] ([AArea])
+            GO
+
+            ALTER TABLE [FaultsCustomX] ADD FOREIGN KEY ([pkid]) REFERENCES [Faults] ([Faultid])
+            GO
+
+            ALTER TABLE [QUOTATIONDETAIL] ADD FOREIGN KEY ([QDid]) REFERENCES [InvoiceHeader] ([ihid])
+            GO
+
+            ALTER TABLE [CategoryDetail] ADD FOREIGN KEY ([CDCategoryName]) REFERENCES [Faults] ([Category2])
+            GO
+
+            ALTER TABLE [CategoryDetail] ADD FOREIGN KEY ([CDCategoryName]) REFERENCES [Faults] ([Category3])
+            GO
+
+            ALTER TABLE [CategoryDetail] ADD FOREIGN KEY ([CDCategoryName]) REFERENCES [Faults] ([Category4])
+            GO
+
+            ALTER TABLE [CategoryDetail] ADD FOREIGN KEY ([CDCategoryName]) REFERENCES [Faults] ([Category5])
+            GO
+
+            ALTER TABLE [Lookup] ADD FOREIGN KEY ([Lid]) REFERENCES [CategoryDetail] ([cdgroup])
+            GO
+
+            ALTER TABLE [RelatedItems] ADD FOREIGN KEY ([RIchildid]) REFERENCES [item] ([iid])
+            GO
+
+            ALTER TABLE [item] ADD FOREIGN KEY ([iid]) REFERENCES [RelatedItems] ([RIparentid])
+            GO
+        `;
+
+        const tables = {};
+        const joinMap = {};
+        const requestTypeMap = {
+            'All': [],
+            'Incident': [1],
+            'Change': [2],
+            'Problem': [3],
+            'Service Request': [4]
+        };
+
+        function parseSchema(sql) {
+            const blocks = sql.split(/\s*GO\s*/).filter(block => block.trim() !== '');
+            
+            // First pass: Parse tables and their columns
+            blocks.forEach(block => {
+                const tableMatch = block.match(/CREATE TABLE \[(\w+)\] \((.*)\)/s);
+                if (tableMatch) {
+                    const tableName = tableMatch[1];
+                    const content = tableMatch[2];
+
+                    const columnRegex = /\[([^\]]+)\]\s+([a-zA-Z]+(\([^)]+\))?(\(\d+\))?(\(\d+, \d+\))?)/g;
+                    let columnMatch;
+                    const columns = [];
+                    while ((columnMatch = columnRegex.exec(content)) !== null) {
+                        const name = columnMatch[1];
+                        const type = columnMatch[2];
+                        columns.push({ name, type });
+                    }
+
+                    tables[tableName] = {
+                        name: tableName,
+                        columns: columns
+                    };
+                }
+            });
+
+            // Second pass: Parse foreign keys and build join map
+            const fkRegex = /ALTER TABLE \[(\w+)\] ADD FOREIGN KEY \(\[([^\]]+)\]\s*(,\s*\[([^\]]+)\])*\) REFERENCES \[(\w+)\] \(\[([^\]]+)\]\s*(,\s*\[([^\]]+)\])*\)/g;
+            let fkMatch;
+            while ((fkMatch = fkRegex.exec(sql)) !== null) {
+                const fromTable = fkMatch[1];
+                const fromCols = [fkMatch[2], fkMatch[4]].filter(Boolean);
+                const toTable = fkMatch[5];
+                const toCols = [fkMatch[6], fkMatch[8]].filter(Boolean);
+
+                const condition = fromCols.map((fromCol, i) => `[${fromTable}].[${fromCol}] = [${toTable}].[${toCols[i]}]`).join(' AND ');
+
+                if (!joinMap[fromTable]) {
+                    joinMap[fromTable] = {};
+                }
+                joinMap[fromTable][toTable] = condition;
+            }
+
+            // Manually add the many-to-one joins that aren't explicit FKs
+            joinMap['CategoryDetail']['Faults'] = '[CategoryDetail].[CDCategoryName] = [Faults].[Category2] OR [CategoryDetail].[CDCategoryName] = [Faults].[Category3] OR [CategoryDetail].[CDCategoryName] = [Faults].[Category4] OR [CategoryDetail].[CDCategoryName] = [Faults].[Category5]';
+        }
+
+        function getPossibleJoins(selectedTables, selectedJoins) {
+            const possibleJoins = {};
+            const allTablesInQuery = new Set([...Object.keys(selectedTables), ...Object.values(selectedJoins).flatMap(join => [join.from, join.to])]);
+
+            allTablesInQuery.forEach(tableName => {
+                if (joinMap[tableName]) {
+                    for (const joinTable in joinMap[tableName]) {
+                        if (!allTablesInQuery.has(joinTable)) {
+                            const uniqueKey = `${tableName}-${joinTable}`;
+                            if (!selectedJoins[uniqueKey]) {
+                                if (!possibleJoins[joinTable]) {
+                                    possibleJoins[joinTable] = [];
+                                }
+                                possibleJoins[joinTable].push({
+                                    from: tableName,
+                                    to: joinTable,
+                                    condition: joinMap[tableName][joinTable]
+                                });
+                            }
+                        }
+                    }
+                }
+                for (const potentialJoiner in joinMap) {
+                    if (joinMap[potentialJoiner] && joinMap[potentialJoiner][tableName] && !allTablesInQuery.has(potentialJoiner)) {
+                        const uniqueKey = `${potentialJoiner}-${tableName}`;
+                        if (!selectedJoins[uniqueKey]) {
+                            if (!possibleJoins[potentialJoiner]) {
+                                possibleJoins[potentialJoiner] = [];
+                            }
+                            possibleJoins[potentialJoiner].push({
+                                from: potentialJoiner,
+                                to: tableName,
+                                condition: joinMap[potentialJoiner][tableName]
+                            });
+                        }
+                    }
+                }
+            });
+
+            return possibleJoins;
+        }
+
+        let selectedTables = {};
+        const selectedJoins = {};
+        const whereConditions = [];
+        const selectedAggregates = [];
+        let groupByColumns = [];
+        let selectedRequestType = 'All';
+
+        function generateQuery() {
+            const selectedFields = [];
+            const tablesInQuery = new Set();
+            
+            // Add aggregate fields
+            selectedAggregates.forEach(agg => {
+                const column = agg.column ? `[${agg.table}].[${agg.column}]` : '*';
+                selectedFields.push(`${agg.func}(${column}) AS ${agg.alias}`);
+            });
+
+            // Add fields to selectedFields array and tables to the set
+            for (const tableName in selectedTables) {
+                if (selectedTables[tableName].isStar) {
+                    selectedFields.push(`[${tableName}].*`);
+                } else {
+                    selectedTables[tableName].columns.forEach(col => {
+                        selectedFields.push(`[${tableName}].[${col}]`);
+                    });
+                }
+                tablesInQuery.add(tableName);
+            }
+
+            // Add tables from selected joins
+            for (const joinKey in selectedJoins) {
+                const join = selectedJoins[joinKey];
+                tablesInQuery.add(join.from);
+                tablesInQuery.add(join.to);
+            }
+            
+            const selectedTableNames = Object.keys(selectedTables);
+            const selectedJoinKeys = Object.keys(selectedJoins);
+            const hasSelections = selectedTableNames.length > 0 || selectedJoinKeys.length > 0 || selectedAggregates.length > 0;
+
+            if (!hasSelections) {
+                document.getElementById('query-output-sql').value = '';
+                updateJoinInfoPanel();
+                return;
+            }
+
+            // Build the query
+            let query = `SELECT\n    ${selectedFields.length > 0 ? selectedFields.join(',\n    ') : '*'}\n`;
+
+            const firstTable = selectedTableNames.length > 0 ? selectedTableNames[0] : (selectedJoinKeys.length > 0 ? selectedJoins[selectedJoinKeys[0]].from : null);
+
+            if (firstTable) {
+                query += `FROM [${firstTable}]`;
+                
+                // Add all selected joins
+                for (const joinKey in selectedJoins) {
+                    const join = selectedJoins[joinKey];
+                    query += `\n    INNER JOIN [${join.to}] ON ${join.condition}`;
+                }
+            }
+            
+            let whereClause = `[Faults].[fdeleted] = 0`;
+
+            // Add RequestType filter
+            if (selectedRequestType !== 'All') {
+                const ids = requestTypeMap[selectedRequestType];
+                if (ids && ids.length > 0) {
+                     whereClause += `\n    AND [Faults].[RequestTypeNew] IN (${ids.join(', ')})`;
+                }
+            }
+
+            // Add custom WHERE conditions
+            whereConditions.forEach(condition => {
+                whereClause += `\n    ${condition.operatorType} [${condition.table}].[${condition.column}] ${condition.operator} '${condition.value}'`;
+            });
+            
+            query += `\nWHERE ${whereClause}`;
+            
+            // Add GROUP BY clause
+            if (groupByColumns.length > 0) {
+                const groupByClause = groupByColumns.map(col => `[${col.table}].[${col.name}]`).join(', ');
+                query += `\nGROUP BY\n    ${groupByClause}`;
+            }
+
+            document.getElementById('query-output-sql').value = query;
+            updateJoinInfoPanel();
+            updateGroupBySelect();
+        }
+
+        function updateJoinInfoPanel() {
+            const panel = document.getElementById('join-info-panel-sql');
+            const joinList = document.getElementById('join-list');
+            joinList.innerHTML = '';
+
+            const allTablesInQuery = new Set([...Object.keys(selectedTables), ...Object.values(selectedJoins).flatMap(join => [join.from, join.to])]);
+            
+            if (allTablesInQuery.size === 0) {
+                panel.querySelector('p').textContent = 'Select a table to see possible joins.';
+                return;
+            }
+
+            panel.querySelector('p').textContent = '';
+
+            const possibleJoins = getPossibleJoins(selectedTables, selectedJoins);
+
+            let hasJoins = false;
+            const joinKeys = Object.keys(possibleJoins).sort();
+
+            joinKeys.forEach(table => {
+                if (possibleJoins[table].length > 0) {
+                    hasJoins = true;
+                    const tableHeader = document.createElement('h5');
+                    tableHeader.textContent = `Joins to ${table}:`;
+                    tableHeader.className = 'text-gray-300 font-bold mt-2 mb-1';
+                    joinList.appendChild(tableHeader);
+
+                    possibleJoins[table].forEach(join => {
+                        const li = document.createElement('li');
+                        const uniqueKey = `${join.from}-${join.to}`;
+                        const isChecked = selectedJoins[uniqueKey] !== undefined;
+                        li.innerHTML = `
+                            <label class="flex items-center space-x-2">
+                                <input type="checkbox" data-from="${join.from}" data-to="${join.to}" data-condition="${join.condition}" ${isChecked ? 'checked' : ''} class="form-checkbox h-4 w-4 text-purple-600 transition duration-150 ease-in-out">
+                                <span class="text-sm">
+                                    <span class="join-direction-sql">${join.from} -> ${join.to}</span>
+                                    <span class="text-gray-400 text-xs block">${join.condition}</span>
+                                </span>
+                            </label>
+                        `;
+                        joinList.appendChild(li);
+                    });
+                }
+            });
+
+            if (!hasJoins) {
+                panel.querySelector('p').textContent = 'No available joins for the selected tables.';
+            }
+
+            joinList.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                checkbox.addEventListener('change', (e) => {
+                    const from = e.target.dataset.from;
+                    const to = e.target.dataset.to;
+                    const condition = e.target.dataset.condition;
+                    const uniqueKey = `${from}-${to}`;
+
+                    if (e.target.checked) {
+                         selectedJoins[uniqueKey] = { from, to, condition };
+                         if (!selectedTables[from]) {
+                            selectedTables[from] = { columns: [], isStar: false };
+                         }
+                         if (!selectedTables[to]) {
+                            selectedTables[to] = { columns: [], isStar: false };
+                         }
+                    } else {
+                        delete selectedJoins[uniqueKey];
+                    }
+                    generateQuery();
+                });
+            });
+        }
+
+        function renderSchema() {
+            const container = document.getElementById('schema-container-sql');
+            container.innerHTML = '';
+            
+            const tableNames = Object.keys(tables).sort();
+            const faultsIndex = tableNames.indexOf('Faults');
+            if (faultsIndex > -1) {
+                tableNames.splice(faultsIndex, 1);
+                tableNames.unshift('Faults');
+            }
+
+            tableNames.forEach(tableName => {
+                const table = tables[tableName];
+                const tableItem = document.createElement('div');
+                tableItem.className = `table-item-sql collapsed`;
+
+                const header = document.createElement('div');
+                header.className = 'table-header-controls-sql';
+                header.innerHTML = `
+                    <span class="toggle-icon-sql">+</span>
+                    <h3 class="flex-1">${tableName}</h3>
+                    <span class="select-all-sql" data-table="${tableName}">Select All</span>
+                `;
+                header.addEventListener('click', (e) => {
+                    if (e.target.tagName !== 'SPAN' || !e.target.classList.contains('select-all-sql')) {
+                        const isCollapsed = tableItem.classList.toggle('collapsed');
+                        header.querySelector('.toggle-icon-sql').textContent = isCollapsed ? '+' : '-';
+                    }
+                });
+                tableItem.appendChild(header);
+
+                const fieldList = document.createElement('ul');
+                fieldList.className = 'field-list-sql';
+                table.columns.forEach(col => {
+                    const fieldItem = document.createElement('li');
+                    fieldItem.innerHTML = `
+                        <label class="flex items-center space-x-2 text-sm text-gray-400 hover:text-gray-200 transition-colors duration-200 cursor-pointer">
+                            <input type="checkbox" data-table="${tableName}" data-field="${col.name}">
+                            <span>${col.name}</span>
+                        </label>
+                    `;
+                    fieldList.appendChild(fieldItem);
+                });
+                tableItem.appendChild(fieldList);
+
+                container.appendChild(tableItem);
+
+                tableItem.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                    checkbox.addEventListener('change', (e) => {
+                        const tableName = e.target.dataset.table;
+                        const fieldName = e.target.dataset.field;
+                        if (!selectedTables[tableName]) {
+                            selectedTables[tableName] = {
+                                columns: [],
+                                isStar: false
+                            };
+                        }
+
+                        if (e.target.checked) {
+                            selectedTables[tableName].columns.push(fieldName);
+                        } else {
+                            selectedTables[tableName].columns = selectedTables[tableName].columns.filter(f => f !== fieldName);
+                            if (selectedTables[tableName].columns.length === 0 && !selectedTables[tableName].isStar) {
+                                delete selectedTables[tableName];
+                            }
+                        }
+                        updateAllSelectors();
+                        generateQuery();
+                    });
+                });
+
+                tableItem.querySelector('.select-all-sql').addEventListener('click', (e) => {
+                    const tableName = e.target.dataset.table;
+                    if (!selectedTables[tableName]) {
+                        selectedTables[tableName] = { columns: [], isStar: false };
+                    }
+
+                    if (selectedTables[tableName].isStar) {
+                        selectedTables[tableName].isStar = false;
+                        selectedTables[tableName].columns = [];
+                        e.target.textContent = 'Select All';
+                        tableItem.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+                    } else {
+                        if (selectedTables[tableName].columns.length > 0) {
+                             selectedTables[tableName].columns = [];
+                        }
+                        selectedTables[tableName].isStar = true;
+                        e.target.textContent = 'Use *';
+                        tableItem.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+                    }
+                    updateAllSelectors();
+                    generateQuery();
+                });
+            });
+        }
+        
+        function updateAllSelectors() {
+            const allColumns = getAllAvailableColumns();
+            renderWhereBuilder(allColumns);
+            updateGroupBySelect(allColumns);
+            updateAggregateSelectors(allColumns);
+        }
+
+        function getAllAvailableColumns() {
+            const allTablesInQuery = new Set([...Object.keys(selectedTables), ...Object.values(selectedJoins).flatMap(join => [join.from, join.to])]);
+            const columns = [];
+            allTablesInQuery.forEach(tableName => {
+                const table = tables[tableName];
+                if (table) {
+                    table.columns.forEach(col => {
+                        columns.push({ table: tableName, name: col.name });
+                    });
+                }
+            });
+            return columns;
+        }
+
+        function renderWhereBuilder(columns) {
+            const container = document.getElementById('where-conditions-container');
+            container.innerHTML = '';
+            
+            whereConditions.forEach((condition, index) => {
+                const row = document.createElement('div');
+                row.className = 'where-row';
+                row.innerHTML = `
+                    <select class="operator-type-select ${index === 0 ? 'hidden' : ''}">
+                        <option value="AND" ${condition.operatorType === 'AND' ? 'selected' : ''}>AND</option>
+                        <option value="OR" ${condition.operatorType === 'OR' ? 'selected' : ''}>OR</option>
+                    </select>
+                    <select class="column-select"></select>
+                    <select class="operator-select">
+                        <option value="=">=</option>
+                        <option value="!=">!=</option>
+                        <option value=">">></option>
+                        <option value="<"><</option>
+                        <option value="LIKE">LIKE</option>
+                    </select>
+                    <input type="text" class="value-input flex-1" placeholder="Value">
+                    <button class="add-remove-btn remove-btn">-</button>
+                `;
+                
+                const columnSelect = row.querySelector('.column-select');
+                columns.forEach(col => {
+                    const option = document.createElement('option');
+                    option.value = `${col.table}.${col.name}`;
+                    option.textContent = `[${col.table}].[${col.name}]`;
+                    if (col.table === condition.table && col.name === condition.column) {
+                        option.selected = true;
+                    }
+                    columnSelect.appendChild(option);
+                });
+
+                row.querySelector('.operator-select').value = condition.operator;
+                row.querySelector('.value-input').value = condition.value;
+                
+                row.querySelector('.operator-type-select').addEventListener('change', (e) => {
+                    whereConditions[index].operatorType = e.target.value;
+                    generateQuery();
+                });
+                row.querySelector('.column-select').addEventListener('change', (e) => {
+                    const [table, column] = e.target.value.split('.');
+                    whereConditions[index].table = table;
+                    whereConditions[index].column = column;
+                    generateQuery();
+                });
+                row.querySelector('.operator-select').addEventListener('change', (e) => {
+                    whereConditions[index].operator = e.target.value;
+                    generateQuery();
+                });
+                row.querySelector('.value-input').addEventListener('input', (e) => {
+                    whereConditions[index].value = e.target.value;
+                    generateQuery();
+                });
+                row.querySelector('.remove-btn').addEventListener('click', () => {
+                    whereConditions.splice(index, 1);
+                    renderWhereBuilder(getAllAvailableColumns());
+                    generateQuery();
+                });
+
+                container.appendChild(row);
+            });
+        }
+        
+        document.getElementById('add-where-btn').addEventListener('click', () => {
+            const columns = getAllAvailableColumns();
+            if (columns.length > 0) {
+                whereConditions.push({
+                    table: columns[0].table,
+                    column: columns[0].name,
+                    operator: '=',
+                    value: '',
+                    operatorType: 'AND'
+                });
+                renderWhereBuilder(columns);
+                generateQuery();
+            } else {
+                alert('Please select at least one field to create a WHERE condition.');
+            }
+        });
+
+        function updateRequestTypeControl() {
+            const container = document.getElementById('request-type-control-container');
+            container.innerHTML = '';
+            
+            const select = document.createElement('select');
+            select.id = 'request-type-select';
+            select.className = 'flex-1 p-2 rounded-md bg-gray-700 text-gray-200 border border-gray-600 w-full';
+            
+            for (const desc in requestTypeMap) {
+                const option = document.createElement('option');
+                option.value = desc;
+                option.textContent = desc;
+                if (desc === selectedRequestType) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            }
+            
+            select.addEventListener('change', (e) => {
+                selectedRequestType = e.target.value;
+                generateQuery();
+            });
+            
+            container.appendChild(select);
+        }
+
+        function updateGroupBySelect(columns) {
+            const select = document.getElementById('group-by-select');
+            select.innerHTML = '';
+            const allColumns = columns || getAllAvailableColumns();
+            
+            allColumns.forEach(col => {
+                const option = document.createElement('option');
+                option.value = `${col.table}.${col.name}`;
+                option.textContent = `[${col.table}].[${col.name}]`;
+                if (groupByColumns.some(g => g.table === col.table && g.name === col.name)) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+            
+            select.addEventListener('change', () => {
+                groupByColumns = Array.from(select.selectedOptions).map(opt => {
+                    const [table, name] = opt.value.split('.');
+                    return { table, name };
+                });
+                generateQuery();
+            });
+        }
+        
+        function updateAggregateSelectors(columns) {
+            const select = document.getElementById('aggregate-column');
+            select.innerHTML = `<option value="">-- Select Column --</option>`;
+            const allColumns = columns || getAllAvailableColumns();
+            
+            allColumns.forEach(col => {
+                const option = document.createElement('option');
+                option.value = `${col.table}.${col.name}`;
+                option.textContent = `[${col.table}].[${col.name}]`;
+                select.appendChild(option);
+            });
+            
+            renderAggregatesList();
+        }
+        
+        function renderAggregatesList() {
+            const list = document.getElementById('aggregate-list');
+            list.innerHTML = '';
+            selectedAggregates.forEach((agg, index) => {
+                const li = document.createElement('li');
+                li.className = 'flex items-center space-x-2';
+                li.innerHTML = `
+                    <span>${agg.func}(${agg.column ? `[${agg.table}].[${agg.column}]` : '*'}) AS ${agg.alias}</span>
+                    <button class="add-remove-btn remove-agg-btn" data-index="${index}">-</button>
+                `;
+                list.appendChild(li);
+            });
+            
+            list.querySelectorAll('.remove-agg-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const index = parseInt(e.target.dataset.index);
+                    selectedAggregates.splice(index, 1);
+                    generateQuery();
+                });
+            });
+        }
+        
+        document.getElementById('add-aggregate-btn').addEventListener('click', () => {
+            const func = document.getElementById('aggregate-function').value;
+            const columnVal = document.getElementById('aggregate-column').value;
+            
+            if (func) {
+                const [table, column] = columnVal.split('.');
+                const alias = `${func.toLowerCase()}_${column || 'count'}`;
+                selectedAggregates.push({ func, table, column, alias });
+                generateQuery();
+            } else {
+                alert('Please select an aggregate function.');
+            }
+        });
+        
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', () => {
+            parseSchema(schemaString);
+            updateRequestTypeControl();
+            renderSchema();
+            generateQuery();
+
+            document.getElementById('toggle-all-btn').addEventListener('click', () => {
+                const isCollapsed = document.getElementById('toggle-all-btn').textContent.includes('Expand');
+                const tableItems = document.querySelectorAll('.table-item-sql');
+                
+                tableItems.forEach(item => {
+                    const toggleIcon = item.querySelector('.toggle-icon-sql');
+                    if (isCollapsed) {
+                        item.classList.remove('collapsed');
+                        toggleIcon.textContent = '-';
+                    } else {
+                        item.classList.add('collapsed');
+                        toggleIcon.textContent = '+';
+                    }
+                });
+                document.getElementById('toggle-all-btn').textContent = isCollapsed ? 'Collapse All' : 'Expand All';
+            });
+
+            document.getElementById('copy-btn-sql').addEventListener('click', () => {
+                const queryText = document.getElementById('query-output-sql').value;
+                navigator.clipboard.writeText(queryText).then(() => {
+                    const button = document.getElementById('copy-btn-sql');
+                    const originalText = button.innerHTML;
+                    button.innerHTML = 'Copied!';
+                    setTimeout(() => {
+                        button.innerHTML = originalText;
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Failed to copy text: ', err);
+                });
+            });
+
+            document.getElementById('clear-btn-sql').addEventListener('click', () => {
+                document.getElementById('query-output-sql').value = '';
+                selectedTables = {};
+                for (const joinKey in selectedJoins) {
+                    delete selectedJoins[joinKey];
+                }
+                while(whereConditions.length > 0) { whereConditions.pop(); }
+                while(selectedAggregates.length > 0) { selectedAggregates.pop(); }
+                groupByColumns = [];
+                selectedRequestType = 'All';
+                updateRequestTypeControl();
+                const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+                checkboxes.forEach(cb => cb.checked = false);
+                updateAllSelectors();
+                generateQuery();
+            });
+
+            const customJoinBtn = document.getElementById('custom-join-btn');
+            const customJoinContainer = document.getElementById('custom-join-container-sql');
+            const customJoinTable1Select = document.getElementById('custom-join-table1');
+            const customJoinTable2Select = document.getElementById('custom-join-table2');
+            const addJoinBtn = document.getElementById('add-join-btn');
+
+            customJoinBtn.addEventListener('click', () => {
+                customJoinContainer.style.display = customJoinContainer.style.display === 'block' ? 'none' : 'block';
+                const tableNames = Object.keys(tables).sort();
+                const options = tableNames.map(name => `<option value="${name}">${name}</option>`).join('');
+                customJoinTable1Select.innerHTML = options;
+                customJoinTable2Select.innerHTML = options;
+            });
+
+            addJoinBtn.addEventListener('click', () => {
+                const table1 = customJoinTable1Select.value;
+                const table2 = customJoinTable2Select.value;
+                const condition = document.getElementById('custom-join-condition').value.trim();
+
+                if (table1 && table2 && condition) {
+                    const uniqueKey = `${table1}-${table2}`;
+                    selectedJoins[uniqueKey] = { from: table1, to: table2, condition };
+                    
+                    if (!selectedTables[table1]) {
+                        selectedTables[table1] = { columns: [], isStar: false };
+                    }
+                    if (!selectedTables[table2]) {
+                         selectedTables[table2] = { columns: [], isStar: false };
+                    }
+                    updateAllSelectors();
+                    generateQuery();
+                    customJoinContainer.style.display = 'none';
+                } else {
+                    alert('Please select two tables and enter a valid join condition.');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
