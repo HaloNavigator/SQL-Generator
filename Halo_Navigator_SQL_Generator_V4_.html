@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<title>Halo Navigator SQL Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/mermaid@10.4.0/dist/mermaid.min.js">
+
+
+
+
+
+
+
+
+
+
+
+/* -------- Collapsible Panels v11 (pure JS instant toggle, stable) -------- */
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.panel').forEach(panel => {
+    if (panel.querySelector('#schema-area')) return; // skip schema panel
+
+    // Find the header (h3 or h4)
+    const header = panel.querySelector('h3, h4');
+    if (!header) return;
+
+    // Create gradient green button
+    const btn = document.createElement('button');
+    btn.className = 'collapse-toggle';
+    btn.textContent = '−';
+    btn.setAttribute('aria-expanded', 'true');
+
+    // Insert button at the beginning of header
+    header.prepend(btn);
+
+    // Determine all elements inside panel after the header (to toggle)
+    const allChildren = Array.from(panel.children);
+    const indexOfHeader = allChildren.findIndex(c => c.contains(header));
+    const toToggle = allChildren.slice(indexOfHeader + 1);
+
+    // Click event: toggle those elements only
+    btn.addEventListener('click', () => {
+      const collapsed = btn.textContent === '−';
+      btn.textContent = collapsed ? '+' : '−';
+      btn.setAttribute('aria-expanded', String(!collapsed));
+
+      toToggle.forEach(el => {
+        el.style.display = collapsed ? 'none' : '';
+      });
+
+      // Re-render Visualiser when expanding
+      if (!collapsed && panel.querySelector('#mermaid-area')) {
+        setTimeout(() => {
+          if (typeof renderMermaid === 'function') {
+            try { renderMermaid(); } catch(e) { console.warn('Mermaid re-render failed', e); }
+          }
+        }, 100);
+      }
+    });
+  });
+
+  /* Special case: Possible Joins collapsible */
+  const pjWrapper = document.getElementById('possible-joins-wrapper');
+  if (pjWrapper) {
+    const pjHeader = pjWrapper.querySelector('h4');
+    if (pjHeader) {
+      const btn = document.createElement('button');
+      btn.className = 'collapse-toggle';
+      btn.textContent = '−';
+      pjHeader.prepend(btn);
+
+      // Find siblings after header to toggle
+      const children = Array.from(pjWrapper.children);
+      const headerIndex = children.indexOf(pjHeader);
+      const toToggle = children.slice(headerIndex + 1);
+
+      btn.addEventListener('click', () => {
+        const collapsed = btn.textContent === '−';
+        btn.textContent = collapsed ? '+' : '−';
+        toToggle.forEach(el => {
+          el.style.display = collapsed ? 'none' : '';
+        });
+      });
+    }
+  }
+});
+
+</script>
+<style>
+:root{
+  --bg-dark: #07121b;
+  --panel-dark: #0e1720;
+  --muted: #94a3b8;
+  --teal: #00ff87; /* final accent color */
+  --light-panel: #ffffff;
+  --light-text: #071022;
+}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family:"Poppins", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+  background: linear-gradient(180deg,var(--bg-dark),#06121a);
+  color:#e6eef8;
+  -webkit-font-smoothing:antialiased;
+}
+body.light{
+  background: linear-gradient(180deg,#f7fafb,#eef2f4);
+  color:var(--light-text);
+}
+
+header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:14px 18px;
+  border-bottom:1px solid rgba(255,255,255,0.03);
+}
+.brand{ display:flex; gap:12px; align-items:center }
+.brand img{ width:42px; height:42px; border-radius:8px; background:transparent }
+.brand h1{ margin:0; font-size:1.05rem; font-weight:700 }
+.small-muted{ color:var(--muted); font-size:13px }
+body.light .small-muted{ color:#6b7280 }
+
+.grid-main{ display:grid; gap:18px; padding:16px; grid-template-columns:1fr }
+@media(min-width:1024px){ .grid-main{ grid-template-columns:1fr 1fr 1.6fr; padding:20px 28px } }
+
+.panel{
+  background: var(--panel-dark);
+  padding:14px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,0.03);
+  box-shadow:0 8px 30px rgba(0,0,0,0.45);
+}
+body.light .panel{ background:var(--light-panel); border-color: rgba(11,17,32,0.06); box-shadow:0 6px 18px rgba(11,17,32,0.04) }
+
+
+/* Dark mode inputs: match panel background */
+body:not(.light) .search-input,
+body:not(.light) select,
+body:not(.light) textarea {
+  background: #0e1720;
+  color: #ffffff;
+  border: 1px solid rgba(255,255,255,0.10);
+}
+body.light .search-input,
+body.light select,
+body.light textarea {
+  background: #ffffff;
+  color: var(--light-text);
+  border: 1px solid rgba(11,17,32,0.06);
+}
+
+/* inputs */
+.search-input{
+  width:100%;
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,0.04);
+  background:transparent;
+  color:inherit;
+  font-family:"Poppins";
+}
+body.light .search-input{ background:#fff; color:var(--light-text); border:1px solid rgba(11,17,32,0.06) }
+body:not(.light) .search-input{ background: rgba(255,255,255,0.02); color: #e6eef8; border:1px solid rgba(255,255,255,0.03) }
+
+/* Force RequestType dropdown readable (black on white in dark mode) */
+
+
+/* SQL output */
+.sql-output{
+  width:100%;
+  min-height:220px;
+  padding:12px;
+  border-radius:10px;
+  font-family:"Poppins", ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace;
+  font-size:13px;
+  background: rgba(0,0,0,0.18);
+  color:#e6eef8;
+  border:1px solid rgba(255,255,255,0.04);
+}
+body.light .sql-output{ background:#fafafa; color:var(--light-text); border:1px solid rgba(11,17,32,0.06) }
+
+/* buttons */
+.btn{ padding:8px 12px; border-radius:999px; font-weight:700; cursor:pointer; border:0; font-family:"Poppins" }
+.btn-accent{ background:var(--teal); color:#042827; box-shadow:0 6px 18px rgba(0,255,135,0.06) }
+body.light .btn-accent{ color:#fff }
+.btn-ghost{ background:transparent; border:1px solid rgba(255,255,255,0.06); color:inherit; padding:8px 12px; border-radius:999px }
+body.light .btn-ghost{ border-color: rgba(11,17,32,0.06); color:var(--light-text) }
+
+/* schema list */
+.schema-area{ max-height:72vh; overflow:auto; padding-bottom:6px }
+.table-card{ border-radius:10px; margin-bottom:10px; border:1px solid rgba(255,255,255,0.02); overflow:hidden }
+.table-card-header{ display:flex; align-items:center; gap:8px; padding:10px 12px; cursor:pointer; background:transparent }
+.table-card-header h3{ margin:0; font-size:0.98rem; font-weight:700 }
+.table-fields{ padding:8px 12px; display:none } /* collapsed by default */
+.table-fields label{ display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:13px; color:inherit }
+
+/* mermaid wrapper & spinner */
+.mermaid-wrapper{ margin-top:12px; border-radius:10px; padding:10px; overflow:visible; border:1px solid rgba(255,255,255,0.02) }
+.spinner{ width:34px; height:34px; border-radius:50%; border:4px solid rgba(255,255,255,0.06); border-top-color:var(--teal); animation:spin 1s linear infinite; display:inline-block }
+@keyframes spin { to { transform: rotate(360deg) } }
+
+/* small */
+.kv{ font-size:13px; color:var(--muted) }
+body.light .kv{ color:#6b7280 }
+
+/* responsive tweaks */
+@media(max-width:900px){
+  .grid-main{ grid-template-columns:1fr; padding:12px }
+  .brand img{ width:36px; height:36px }
+}
+
+.collapse-toggle {
+  font-weight: 700;
+  font-size: 1rem;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+
+/* Collapse style: hide everything except the panel header container */
+
+.panel-header-container { display: block; }
+
+
+/* Ensure header (with toggle button) always visible */
+
+
+
+/* Collapsible panel style: keep .panel-header visible when collapsed */
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+
+/* Collapsible panel: hide all direct children after .panel-header when collapsed */
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+
+/* Collapsible panel: hide all direct children after .panel-header when collapsed */
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+
+/* Green filled collapse buttons, placed before title */
+.collapse-toggle {
+  background-color: #22c55e;
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.collapse-toggle:hover {
+  background-color: #16a34a;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+}
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+
+
+
+
+
+
+
+/* Neutral minimalist collapse buttons (no background) */
+.collapse-toggle {
+  background: none;
+  color: inherit;
+  border: none;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.collapse-toggle:hover {
+  transform: scale(1.05);
+  opacity: 0.8;
+}
+h3, h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+
+/* Improved cross-browser dropdown styling (dark & light mode) */
+select.search-input {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: #0e1720;
+  color: #e6eef8;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  padding: 10px 36px 10px 12px;
+  font-family: "Poppins", system-ui, sans-serif;
+  font-size: 14px;
+  background-image: url("data:image/svg+xml;utf8,<svg fill='%23e6eef8' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><path d='M5.516 7.548l4.484 4.482 4.484-4.482.516.516-5 5-5-5z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px;
+  cursor: pointer;
+}
+
+select.search-input option {
+  background-color: #0e1720;
+  color: #e6eef8;
+}
+
+/* Hover and focus states for better clarity */
+select.search-input:hover,
+select.search-input:focus {
+  border-color: var(--teal);
+  outline: none;
+}
+
+/* Light mode */
+body.light select.search-input {
+  background-color: #ffffff;
+  color: var(--light-text);
+  border: 1px solid rgba(11,17,32,0.15);
+  background-image: url("data:image/svg+xml;utf8,<svg fill='%23071022' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><path d='M5.516 7.548l4.484 4.482 4.484-4.482.516.516-5 5-5-5z'/></svg>");
+}
+
+body.light select.search-input option {
+  background-color: #ffffff;
+  color: var(--light-text);
+}
+</style>
+</head>
+<body>
+<header>
+<div class="brand">
+<!-- Embedded PNG logo (original circular style) -->
+<img alt="Halo Navigator" src="HN.png"/>
+<div>
+<h1>Halo Navigator</h1>
+<div class="small-muted">Join Visualiser &amp; SQL Generator</div>
+</div>
+</div>
+<div style="display:flex;gap:8px;align-items:center">
+<button class="btn-ghost" id="theme-toggle" title="Toggle theme">🌙🌞</button>
+<button class="btn-ghost" id="toggle-visualiser">Hide Visualiser</button>
+</div>
+</header>
+<main class="grid-main">
+<!-- LEFT: schema -->
+<section class="panel">
+<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
+<div style="flex:1">
+<label class="kv">Search tables &amp; fields</label>
+<input class="search-input" id="table-search" placeholder="Search table or column name..."/>
+</div>
+<div>
+<button class="btn-ghost" id="expand-collapse">Expand All</button>
+</div>
+</div>
+<div id="schema-loading" style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+<div aria-hidden="" class="spinner"></div><div class="kv">Loading schema &amp; joins...</div>
+</div>
+<div class="schema-area" id="schema-area"></div>
+</section>
+<!-- MIDDLE: filters -->
+<section style="display:flex;flex-direction:column;gap:12px">
+<div class="panel">
+<h4 style="margin:0 0 8px 0">Filter by Request Type</h4>
+<div style="display:flex;gap:8px;align-items:center">
+<select class="search-input" id="request-type">
+<option value="All">All</option>
+<option value="Incident">Incident</option>
+<option value="Change">Change</option>
+<option value="Problem">Problem</option>
+<option value="Service Request">Service Request</option>
+</select>
+</div>
+<div class="kv" style="margin-top:8px">Selecting a type adds <code>AND [Faults].[RequestTypeNew] IN (...)</code> when Faults is in the query.</div>
+</div>
+<div class="panel">
+<h4 style="margin:0 0 8px 0">WHERE &amp; Conditions</h4>
+<div id="where-container"></div>
+<div style="margin-top:8px"><button class="btn btn-accent" id="add-where">Add Condition</button></div>
+</div>
+<div class="panel">
+<h4 style="margin:0 0 8px 0">Aggregates &amp; GROUP BY</h4>
+<div style="display:flex;gap:8px">
+<select class="search-input" id="agg-func" style="width:120px"><option value="">Function</option><option>COUNT</option><option>SUM</option><option>AVG</option><option>MAX</option><option>MIN</option></select>
+<select class="search-input" id="agg-col" style="flex:1"></select>
+<button class="btn btn-accent" id="add-agg">Add</button>
+</div>
+<div style="margin-top:8px">
+<label class="kv">GROUP BY</label>
+<select class="search-input" id="group-by" multiple="" style="width:100%;min-height:64px;margin-top:6px"></select>
+</div>
+<ul id="agg-list" style="margin-top:10px"></ul>
+</div>
+</section>
+<!-- RIGHT: SQL + joins + visualiser -->
+<section style="display:flex;flex-direction:column;gap:12px">
+<div class="panel">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+<div>
+<h3 style="margin:0">Generated SQL</h3>
+<div class="kv"></div>
+</div>
+</div>
+<textarea class="sql-output" id="sql-output" placeholder="Generated SQL will appear here" readonly=""></textarea>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;align-items:center">
+<button class="btn btn-accent" id="export-btn">Export .sql</button>
+<button class="btn btn-accent" id="copy-btn">Copy</button>
+<button class="btn btn-accent" id="clear-btn">Clear Query</button>
+</div>
+<!-- Possible joins beneath SQL -->
+<div id="possible-joins-wrapper" style="margin-top:12px">
+<h4 style="margin:0 0 8px 0">Possible joins (select to include in query)</h4>
+<div class="kv" id="possible-joins">Select tables or joins to see related joins here.</div>
+<div id="custom-join-container" style="margin-top:10px;">
+<p class="kv mb-2">Define a custom JOIN condition:</p>
+<div style="display:flex;gap:8px;align-items:center">
+<select class="search-input" id="custom-join-table1"></select>
+<span class="kv">JOIN</span>
+<select class="search-input" id="custom-join-table2"></select>
+</div>
+<div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+<input class="search-input" id="custom-join-condition" placeholder="[A].[id] = [B].[aid]" style="flex:1"/>
+<button class="btn btn-ghost" id="add-join-btn">Add Join</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Visualiser -->
+<div class="panel mermaid-wrapper" id="visualiser-panel">
+<div style="display:flex;justify-content:space-between;align-items:center">
+<div>
+<h3 style="margin:0">Visualiser</h3>
+<div class="kv">Live joins &amp; schema visualization — actual SQL table names shown</div>
+</div>
+<div style="display:flex;gap:8px;align-items:center">
+<button class="btn btn-ghost" id="refresh-visualiser">Refresh</button>
+<button class="btn btn-accent" id="export-visualiser-png">PNG</button>
+</div>
+</div>
+<div id="mermaid-area" style="margin-top:12px">Select a table to render the Visualiser.</div>
+</div>
+</section>
+</main>
+<script>
+/* Halo Navigator V12 — Final
+   - Embedded PNG logo base64 in header
+   - Joins added for requested tables (bidirectional)
+   - Visualiser header renamed to "Visualiser"
+   - Visualiser empty until a table or join is selected
+   - Display names Title Case
+   - Accent color #00ff87
+*/
+
+/* ---------- Embedded TABLES ---------- */
+const TABLES = {
+  "ApprovalProcess": {"columns":["APid","APName"]},
+  "Area": {"columns":["AArea","AAreaDesc"]},
+  "Batch": {"columns":["Bid","BName"]},
+  "CategoryDetail": {"columns":["CDCategoryName","CDId"]},
+  "Company": {"columns":["CNum","CName"]},
+  "Contract": {"columns":["ContractID","CDesc"]},
+  "Device": {"columns":["DDevNum","DSite","DInvNo","OwnerID","DType","DName","DCompanyNum","DSection"]},
+  "DeviceInfo": {"columns":["DIid","DIDevNum","DIKey","DIValue"]},
+  "Downtime": {"columns":["DTid","DTFaultid","DTstart","DTend"]},
+  "Faults": {"columns":["Faultid","Username","UserID","PhoneNumber","Symptom","Status","Seriousness","DateOccured","SiteNumber","Areaint","Sectio_","RequestTypeNew","FServiceid","FFlowID","SLAID","DevSite","DeviceNumber","ClearWhoInt","fdeleted","Category2","Category3","Category4","Category5"]},
+  "FaultsCustom1": {"columns":["FC1id","FC1Val"]},
+  "FaultsCustomX": {"columns":["FCXid","FCXFaultID","FCXVal","FCXLookupID"]},
+  "FaultDevice": {"columns":["FDfaultid","FDsiteid","FDdevnum"]},
+  "FaultWatch": {"columns":["FWfaultid","FWunum","FWemail","FWid"]},
+  "FaultApproval": {"columns":["FAid","FAApid","FAstatus"]},
+  "FaultAdditionalAgents": {"columns":["FAAId","FAAFaultid","FAAUser"]},
+  "Faulttodo": {"columns":["FTid","FTFaultid","FTdesc"]},
+  "Feedback": {"columns":["FBid","FBFaultid","FBNotes"]},
+  "FlowHeader": {"columns":["FHid","FHName"]},
+  "FlowStages": {"columns":["FSid","FSHeaderID","FSName"]},
+  "Generic": {"columns":["Gid","GName","GSiteNum"]},
+  "InvoiceHeader": {"columns":["ihid","ihRef","ihTotal"]},
+  "InvoiceDetail": {"columns":["IdID","IdIHid","ID_ItemID","IDAmt"]},
+  "InvoicePayment": {"columns":["IPid","IPIHid","IPAmount"]},
+  "Item": {"columns":["iid","iname","iRef"]},
+  "Journey": {"columns":["Jid","JFaultid","JDesc"]},
+  "Kbentry": {"columns":["KBid","KBTitle"]},
+  "Licence": {"columns":["Lid","LName"]},
+  "Lookup": {"columns":["LookupID","LDesc"]},
+  "Orderhead": {"columns":["OHid","OHref"]},
+  "Orderline": {"columns":["OLid","OHid","OLitem"]},
+  "Payment": {"columns":["PayId","PayAmount"]},
+  "Paymentheader": {"columns":["PHid","PHTotal"]},
+  "Porderhdr": {"columns":["POHDRid","POHDRref"]},
+  "Porderline": {"columns":["PLineId","PLineVal"]},
+  "Policy": {"columns":["PId","PDesc","PSLAID"]},
+  "Policygroup": {"columns":["PGid","PGName"]},
+  "Portals": {"columns":["PId","PName"]},
+  "Portallog": {"columns":["PLid","PLMsg"]},
+  "Profile": {"columns":["PRid","PRName"]},
+  "Process": {"columns":["ProcId","ProcName"]},
+  "Processstages": {"columns":["PSid","PSName"]},
+  "Quotationheader": {"columns":["QHid","QHRef"]},
+  "Quotationdetail": {"columns":["QDId","QDVal"]},
+  "Relateditems": {"columns":["RIid","RIparentid","RIchildid","RIref"]},
+  "Resourcetimelog": {"columns":["RTLid","RTLFaultid","RTLSection","RTLUnum","RTLtime"]},
+  "Roundrobinlog": {"columns":["RRLid","RRLinfo","RRLFaultid"]},
+  "Requesttype": {"columns":["RTID","RTDesc"]},
+  "Route": {"columns":["Rid","RName"]},
+  "Servsite": {"columns":["ServSiteNum","ServName"]},
+  "Servicecategory": {"columns":["SCID","SCName"]},
+  "Servicerequestdetails": {"columns":["SRid","SRCategoryID","SRServID"]},
+  "Site": {"columns":["SSitenum","SSitename","SArea","SManager"]},
+  "Sitecontact": {"columns":["SCid","SCName","SCPhone","SCsite","SCuid"]},
+  "Stocklocation": {"columns":["SLocid","SLocName"]},
+  "Stocklevel": {"columns":["SLid","SLQty","SLlocation"]},
+  "Stockbin": {"columns":["SBid","SBname","STBSsitenum"]},
+  "Stdrequest": {"columns":["SRid","SRTemplate"]},
+  "Supplier": {"columns":["SupplierID","SupplierName","SHSupplierID"]},
+  "Supplierorderheader": {"columns":["SHid","SHSupplierID","SHOHID"]},
+  "Supplierorderdetail": {"columns":["SDid","SDSHid","SDItemid","SDOLID"]},
+  "Tree": {"columns":["TreeID","TreeName"]},
+  "Tstatus": {"columns":["TStatusID","TStatusName"]},
+  "Typeinfo": {"columns":["TIid","TIName"]},
+  "Uname": {"columns":["UnameID","UnameName"]},
+  "Userdevice": {"columns":["UDid","UDsite","UDusername","UDdevnum","UDdevsite"]},
+  "Users": {"columns":["uid","Usite","UUsername","Email"]},
+  "Viewlog": {"columns":["VLid","VLFaultID","VLUserID","VLtime"]},
+  "Xtype": {"columns":["XTypeID","XName"]},
+  "Xtypestatus": {"columns":["XTSid","XTSName"]},
+  "Xtypestatusrestrictions": {"columns":["XTRid","XTRName"]},
+  "Inst": {"columns":["InstId","InstVal"]}
+};
+
+/* ---------- Joined map (merged superset, bidirectional) ---------- */
+const JOINMAP = {
+  "Faults": {
+    "Faultdevice": "[Faults].[Faultid] = [FaultDevice].[FDfaultid]",
+    "Faultwatch": "[Faults].[Faultid] = [FaultWatch].[FWfaultid]",
+    "Faultapproval": "[Faults].[Faultid] = [FaultApproval].[FAid]",
+    "Feedback": "[Faults].[Faultid] = [Feedback].[FBFaultid]",
+    "Resourcetimelog": "[Faults].[Faultid] = [ResourceTimeLog].[RTLFaultid]",
+    "Faultadditionalagents": "[Faults].[Faultid] = [FaultAdditionalAgents].[FAAFaultid]",
+    "Faulttodo": "[Faults].[Faultid] = [FaultTodo].[FTFaultid]",
+    "Journey": "[Faults].[Faultid] = [Journey].[JFaultid]",
+    "Downtime": "[Faults].[Faultid] = [Downtime].[DTFaultid]",
+    "Actions": "[Faults].[Faultid] = [Actions].[Faultid]",
+    "Quotationheader": "[Faults].[Faultid] = [QuotationHeader].[QHfaultID]",
+    "Orderhead": "[Faults].[Faultid] = [OrderHead].[OHid]",
+    "Invoicedetail": "[Faults].[Faultid] = [InvoiceDetail].[IdIHid]",
+    "Roundrobinlog": "[Faults].[Faultid] = [RoundRobinLog].[RRLFaultid]",
+    "Stdrequest": "[Faults].[Faultid] = [StdRequest].[SRid]",
+    "Viewlog": "[Faults].[Faultid] = [ViewLog].[VLFaultID]"
+  },
+
+  /* FaultDevice */
+  "Faultdevice": {
+    "Faults": "[FaultDevice].[FDfaultid] = [Faults].[Faultid]",
+    "Site": "[FaultDevice].[FDsiteid] = [Site].[SSitenum]",
+    "Device": "[FaultDevice].[FDdevnum] = [Device].[DDevNum]"
+  },
+
+  "Faultwatch": { "Users": "[FaultWatch].[FWunum] = [Users].[uid]", "Faults": "[FaultWatch].[FWfaultid] = [Faults].[Faultid]" },
+
+  "Faultapproval": { "Approvalprocess": "[FaultApproval].[FAApid] = [ApprovalProcess].[APid]", "Faults": "[FaultApproval].[FAid] = [Faults].[Faultid]" },
+
+  "Resourcetimelog": { "Faults": "[ResourceTimeLog].[RTLFaultid] = [Faults].[Faultid]", "Sectiondetail": "[ResourceTimeLog].[RTLSection] = [Sectiondetail].[SDid]", "Users": "[ResourceTimeLog].[RTLUnum] = [Users].[uid]" },
+
+  "Actions": { "Faults": "[Actions].[Faultid] = [Faults].[Faultid]", "Users": "[Actions].[Who] = [Users].[uid]" },
+
+  "Userdevice": { "Site": "[UserDevice].[UDsite] = [Site].[SSitenum]", "Users": "[UserDevice].[UDusername] = [Users].[uid]", "Device": "[UserDevice].[UDdevnum] = [Device].[DDevNum]" },
+
+  "Device": {
+    "Site": "[Device].[DSite] = [Site].[SSitenum]",
+    "Company": "[Device].[DCompanyNum] = [Company].[CNum]",
+    "Faults": "[Device].[DDevNum] = [Faults].[DeviceNumber] AND [Device].[DSite] = [Faults].[DevSite]",
+    "Userdevice": "[Device].[DDevNum] = [UserDevice].[UDdevnum]",
+    "Deviceinfo": "[Device].[DDevNum] = [DeviceInfo].[DIDevNum]",
+    "Typeinfo": "[Device].[DType] = [TypeInfo].[TIid]",
+    "Sectiondetail": "[Device].[DSection] = [Sectiondetail].[SDid]",
+    "Xtype": "[Device].[DType] = [XType].[XTypeID]"
+  },
+
+  "Deviceinfo": { "Device": "[DeviceInfo].[DIDevNum] = [Device].[DDevNum]" },
+
+  "Item": { "Quotationdetail": "[Item].[iid] = [QuotationDetail].[QDItemid]", "Orderline": "[Item].[iid] = [OrderLine].[OLitem]", "Supplierorderdetail": "[Item].[iid] = [SupplierOrderDetail].[SDItemid]", "Relateditems": "[Item].[iid] = [RelatedItems].[RIparentid] OR [Item].[iid] = [RelatedItems].[RIchildid]" },
+
+  "Orderhead": { "Orderline": "[OrderHead].[OHid] = [OrderLine].[OHid]", "Supplierorderheader": "[OrderHead].[OHid] = [SupplierOrderHeader].[SHOHID]" },
+
+  "Orderline": { "Orderhead": "[OrderLine].[OHid] = [OrderHead].[OHid]", "Item": "[OrderLine].[OLitem] = [Item].[iid]", "Supplierorderdetail": "[OrderLine].[OLid] = [SUPPLIERORDERDETAIL].[SDOLID]" },
+
+  "Supplierorderheader": { "Supplierorderdetail": "[SupplierOrderHeader].[SHid] = [SUPPLIERORDERDETAIL].[SDSHid]", "Supplier": "[SupplierOrderHeader].[SHSupplierID] = [Supplier].[SHSupplierID]" },
+
+  "Supplierorderdetail": { "Supplierorderheader": "[SUPPLIERORDERDETAIL].[SDSHid] = [SupplierOrderHeader].[SHid]", "Item": "[SUPPLIERORDERDETAIL].[SDItemid] = [Item].[iid]", "Orderline": "[SUPPLIERORDERDETAIL].[SDOLID] = [OrderLine].[OLid]" },
+
+  "Sitecontact": { "Site": "[SiteContact].[SCsite] = [Site].[SSitenum]", "Users": "[SiteContact].[SCuid] = [Users].[uid]" },
+
+  "Stockbin": { "Site": "[StockBin].[STBSsitenum] = [Site].[SSitenum]", "Item": "[StockBin].[SBid] = [Item].[iid]" },
+
+  "Stocklevel": { "Stocklocation": "[StockLevel].[SLlocation] = [StockLocation].[SLocid]", "Site": "[StockLevel].[SLlocation] = [Site].[SSitenum]" },
+
+  "Stocklocation": { "Stocklevel": "[StockLocation].[SLocid] = [StockLevel].[SLlocation]" },
+
+  "Area": { "Site": "[Area].[AArea] = [Site].[SArea]" },
+
+  "Sectiondetail": { "Device": "[Sectiondetail].[SDid] = [Device].[DSection]", "Resourcetimelog": "[Sectiondetail].[SDid] = [ResourceTimeLog].[RTLSection]" },
+
+  "Invoiceheader": { "Invoicedetail": "[InvoiceHeader].[ihid] = [InvoiceDetail].[IdIHid]", "Invoicepayment": "[InvoiceHeader].[ihid] = [InvoicePayment].[IPIHid]", "Journey": "[InvoiceHeader].[ihid] = [Journey].[Jid]" },
+
+  "Invoicedetail": { "Item": "[InvoiceDetail].[ID_ItemID] = [Item].[iid]", "Invoiceheader": "[InvoiceDetail].[IdIHid] = [InvoiceHeader].[ihid]", "Faults": "[InvoiceDetail].[IdIHid] = [Faults].[Faultid]" },
+
+  "Invoicepayment": { "Invoiceheader": "[InvoicePayment].[IPIHid] = [InvoiceHeader].[ihid]" },
+
+  "Quotationheader": { "Faults": "[QUOTATIONHEADER].[QHfaultID] = [Faults].[Faultid]", "Quotationdetail": "[QUOTATIONHEADER].[QHid] = [QUOTATIONDETAIL].[QDQHid]", "Users": "[QUOTATIONHEADER].[QHUserID] = [Users].[uid]" },
+
+  "Quotationdetail": { "Quotationheader": "[QUOTATIONDETAIL].[QDQHid] = [QUOTATIONHEADER].[QHid]", "Item": "[QUOTATIONDETAIL].[QDItemid] = [Item].[iid]", "Supplier": "[QUOTATIONDETAIL].[QDsupplier] = [Supplier].[SupplierID]" },
+
+  "Company": { "Device": "[Company].[CNum] = [Device].[DCompanyNum]" },
+
+  "Slahead": { "Faults": "[SLAHead].[SLID] = [Faults].[SLAID]", "Policy": "[SLAHead].[SLID] = [Policy].[PSLAID]" },
+
+  "Policy": { "Slahead": "[Policy].[PSLAID] = [SLAHead].[SLID]" },
+
+  "Requesttype": { "Faults": "[RequestType].[RTID] = [Faults].[RequestTypeNew]" },
+
+  "Relateditems": { "Item": "[RelatedItems].[RIparentid] = [Item].[iid] OR [RelatedItems].[RIchildid] = [Item].[iid]" },
+
+  "Categorydetail": { "Categorydetail": "[CategoryDetail].[CDCategoryName] = [CategoryDetail].[CDCategoryName]" },
+
+  /* FAQ cluster */
+  "Faqlisthead": { "Faqlistdet": "[FAQListHead].[FLHid] = [FAQListDet].[FLDid]", "Faqclient": "[FAQListHead].[FLHClientID] = [FAQClient].[FQClientID]" },
+  "Faqlistdet": { "Faqlisthead": "[FAQListDet].[FLDid] = [FAQListHead].[FLHid]", "Faqsite": "[FAQListDet].[FLDsiteID] = [FAQSite].[FQSiteID]" },
+  "Faqclient": { "Faqlisthead": "[FAQClient].[FQClientID] = [FAQListHead].[FLHClientID]", "Faqsite": "[FAQClient].[FQClientSiteID] = [FAQSite].[FQSiteID]" },
+  "Faqsite": { "Faqclient": "[FAQSite].[FQSiteID] = [FAQClient].[FQClientSiteID]" },
+
+  /* XType family */
+  "Xtype": { "Device": "[XType].[XTypeID] = [Device].[DType]", "Xtypestatus": "[XType].[XTypeID] = [XTypeStatus].[XTSid]" },
+  "Xtypestatus": { "Xtype": "[XTypeStatus].[XTSid] = [XType].[XTypeID]", "Xtypestatusrestrictions": "[XTypeStatus].[XTSid] = [XTypeStatusRestrictions].[XTRid]" },
+  "Xtypestatusrestrictions": { "Xtypestatus": "[XTypeStatusRestrictions].[XTRid] = [XTypeStatus].[XTSid]" },
+
+  /* Added joins for requested tables */
+  "Viewlog": { "Faults": "[ViewLog].[VLFaultID] = [Faults].[Faultid]", "Users": "[ViewLog].[VLUserID] = [Users].[uid]" },
+  "Uname": { "Users": "[Uname].[UnameID] = [Users].[uid]" },
+  "Tstatus": { "Faults": "[Tstatus].[TStatusID] = [Faults].[Status]" },
+  "Tree": { "Sectiondetail": "[Tree].[TreeID] = [Sectiondetail].[SDid]", "Users": "[Tree].[TreeID] = [Users].[uid]" },
+  "Route": { "Faults": "[Route].[Rid] = [Faults].[Faultid]" },
+  "Portals": { "Users": "[Portals].[PId] = [Users].[uid]" },
+  "Payment": { "Invoiceheader": "[Payment].[PayId] = [InvoiceHeader].[ihid]" },
+  "Lookup": { "Faultscustomx": "[Lookup].[LookupID] = [FaultsCustomX].[FCXLookupID]" },
+  "Journey": { "Faults": "[Journey].[JFaultid] = [Faults].[Faultid]" },
+  "Flowheader": { "Faults": "[FlowHeader].[FHid] = [Faults].[FFlowID]", "Flowstages": "[FlowHeader].[FHid] = [FlowStages].[FSHeaderID]" },
+  "Flowstages": { "Flowheader": "[FlowStages].[FSHeaderID] = [FlowHeader].[FHid]" },
+
+  /* preserve earlier simple relationships */
+  "Users": { "Site": "[Users].[Usite] = [Site].[SSitenum]", "Faults": "[Users].[uid] = [Faults].[UserID]" },
+  "Site": { "Area": "[Site].[SArea] = [Area].[AArea]", "Users": "[Site].[SSitenum] = [Users].[Usite]", "Faults": "[Site].[SSitenum] = [Faults].[SiteNumber]" },
+  "Kbentry": { "Faults": "[KBentry].[KBid] = [Faults].[Faultid]" }
+};
+
+/* Make joinmap bidirectional where missing (best-effort swapping) */
+(function ensureBidirectional(){
+  Object.keys(JOINMAP).forEach(a=>{
+    Object.keys(JOINMAP[a]).forEach(b=>{
+      const cond = JOINMAP[a][b];
+      if(!JOINMAP[b]) JOINMAP[b] = {};
+      if(!JOINMAP[b][a]){
+        const reA = new RegExp('\\[' + a.replace(/[-\/\\^$*+?.()|[\]{}]/g,'\\$&') + '\\]', 'g');
+        const reB = new RegExp('\\[' + b.replace(/[-\/\\^$*+?.()|[\]{}]/g,'\\$&') + '\\]', 'g');
+        let rev = cond.replace(reA, '<<TMP>>').replace(reB, `[${a}]`).replace(/<<TMP>>/g, `[${b}]`);
+        JOINMAP[b][a] = rev;
+      }
+    });
+  });
+})();
+
+/* ---------- Runtime state ---------- */
+let tables = {};
+let joinMap = {};
+let selectedTables = {};
+let selectedJoins = {};
+let whereClauses = [];
+let aggregates = [];
+let groupBy = [];
+let requestType = 'All';
+const requestTypeMap = { 'All':[], 'Incident':[1], 'Change':[2], 'Problem':[3], 'Service Request':[4] };
+
+/* UI refs */
+const schemaArea = document.getElementById('schema-area');
+const schemaLoading = document.getElementById('schema-loading');
+const tableSearch = document.getElementById('table-search');
+const expandCollapseBtn = document.getElementById('expand-collapse');
+const requestTypeSel = document.getElementById('request-type');
+const whereContainer = document.getElementById('where-container');
+const addWhereBtn = document.getElementById('add-where');
+const aggFunc = document.getElementById('agg-func');
+const aggCol = document.getElementById('agg-col');
+const addAggBtn = document.getElementById('add-agg');
+const aggList = document.getElementById('agg-list');
+const groupBySel = document.getElementById('group-by');
+const sqlOutput = document.getElementById('sql-output');
+const exportBtn = document.getElementById('export-btn');
+const copyBtn = document.getElementById('copy-btn');
+const clearBtn = document.getElementById('clear-btn');
+const possibleJoinsContainer = document.getElementById('possible-joins');
+const customJoinTable1 = document.getElementById('custom-join-table1');
+const customJoinTable2 = document.getElementById('custom-join-table2');
+const customJoinCondition = document.getElementById('custom-join-condition');
+const addJoinBtn = document.getElementById('add-join-btn');
+const mermaidArea = document.getElementById('mermaid-area');
+const refreshVisualiserBtn = document.getElementById('refresh-visualiser');
+const exportVisualiserPngBtn = document.getElementById('export-visualiser-png');
+const toggleVisualiserBtn = document.getElementById('toggle-visualiser');
+const themeToggle = document.getElementById('theme-toggle');
+
+/* helpers */
+function safeId(name){ return String(name).replace(/[^a-zA-Z0-9_]/g,'_'); }
+function safeLabel(text){ return String(text||'').replace(/\r?\n/g,' ').replace(/"/g,'\\"').replace(/\|/g,'\\|'); }
+function sanitizeSQLValue(v){ return String(v).replace(/'/g,"''"); }
+function titleCaseName(name){
+  if(!name) return name;
+  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+}
+
+/* Load tables into runtime store with displayName */
+(function loadEmbedded(){
+  tables = {};
+  Object.keys(TABLES).forEach(tn=>{
+    tables[tn] = { name: tn, displayName: titleCaseName(tn), columns: (TABLES[tn].columns || []).map(c=>({ name: c })) };
+  });
+  joinMap = JSON.parse(JSON.stringify(JOINMAP));
+})();
+
+/* Render schema: Faults pinned top, alphabetical otherwise; collapsed by default */
+function renderSchema(filter=''){
+  schemaArea.innerHTML = '';
+  const q = (filter||'').trim().toLowerCase();
+  const allNames = Object.keys(tables).filter(n=>n!=='Faults').sort((a,b)=>{
+    return titleCaseName(a).toLowerCase().localeCompare(titleCaseName(b).toLowerCase(), undefined, { sensitivity:'base' });
+  });
+  const ordered = (tables['Faults'] ? ['Faults', ...allNames] : allNames);
+
+  ordered.forEach(tableName=>{
+    const table = tables[tableName];
+    if(!table) return;
+    if(q){
+      const matchT = tableName.toLowerCase().includes(q) || (table.displayName||'').toLowerCase().includes(q);
+      const matchC = table.columns && table.columns.some(c => (c.name||'').toLowerCase().includes(q));
+      if(!matchT && !matchC) return;
+    }
+
+    const card = document.createElement('div'); card.className='table-card';
+    const header = document.createElement('div'); header.className='table-card-header';
+    header.innerHTML = `<div style="flex:1"><h3>${table.displayName}</h3></div><div><button class="btn-ghost select-all" data-table="${tableName}">Select All</button></div>`;
+    const fields = document.createElement('div'); fields.className='table-fields'; // collapsed by default
+
+    (table.columns||[]).forEach(col=>{
+      const lbl = document.createElement('label');
+      lbl.innerHTML = `<input type="checkbox" data-table="${tableName}" data-field="${col.name}" /> <span>${col.name}</span>`;
+      fields.appendChild(lbl);
+    });
+
+    header.addEventListener('click', (e)=>{
+      if(e.target && e.target.classList && e.target.classList.contains('select-all')) return;
+      fields.style.display = (fields.style.display === 'block') ? 'none' : 'block';
+    });
+
+    header.querySelector('.select-all').addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const t = e.target.dataset.table;
+      if(selectedTables[t] && selectedTables[t].isStar){
+        delete selectedTables[t]; e.target.textContent='Select All';
+        fields.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked=false);
+      } else {
+        selectedTables[t] = { isStar:true, columns: (tables[t].columns||[]).map(c=>c.name) };
+        e.target.textContent='Using *';
+        fields.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked=true);
+      }
+      rerender();
+    });
+
+    fields.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+      cb.addEventListener('change', (ev)=>{
+        const t = ev.target.dataset.table, f = ev.target.dataset.field;
+        if(!selectedTables[t]) selectedTables[t] = { isStar:false, columns: [] };
+        if(ev.target.checked){
+          if(!selectedTables[t].columns.includes(f)) selectedTables[t].columns.push(f);
+        } else {
+          selectedTables[t].columns = selectedTables[t].columns.filter(x=>x!==f);
+          if(selectedTables[t].columns.length===0 && !selectedTables[t].isStar) delete selectedTables[t];
+        }
+        rerender();
+      });
+    });
+
+    card.appendChild(header); card.appendChild(fields); schemaArea.appendChild(card);
+  });
+
+  // populate custom join selects (display Title Case labels)
+  const opts = Object.keys(tables).sort((a,b)=> titleCaseName(a).localeCompare(titleCaseName(b))).map(n=>`<option value="${n}">${titleCaseName(n)}</option>`).join('');
+  customJoinTable1.innerHTML = opts; customJoinTable2.innerHTML = opts;
+  schemaLoading.style.display = 'none';
+}
+
+/* Helpers */
+function getAllTablesInQuery(){
+  const s = new Set([...Object.keys(selectedTables)]);
+  Object.values(selectedJoins).forEach(j=>{ s.add(j.from); s.add(j.to); });
+  return Array.from(s);
+}
+function getAvailableColumns(){
+  const cols = [];
+  getAllTablesInQuery().forEach(t=>{
+    if(tables[t]) (tables[t].columns||[]).forEach(c=>cols.push({ table:t, name:c.name }));
+  });
+  return cols;
+}
+
+/* Possible Joins */
+function renderPossibleJoins(){
+  const used = new Set(getAllTablesInQuery());
+  possibleJoinsContainer.innerHTML = '';
+  if(used.size === 0 && Object.keys(selectedJoins).length === 0){
+    possibleJoinsContainer.innerHTML = '<div class="kv">Select a table or add joins to see related joins here.</div>'; return;
+  }
+  const candidates = [];
+  Object.keys(joinMap||{}).forEach(f=>{
+    Object.keys(joinMap[f]||{}).forEach(t=>{
+      const cond = joinMap[f][t];
+      if(used.has(f) || used.has(t) || Object.keys(selectedJoins).some(k=>k===`${f}-${t}` || k===`${t}-${f}`)){
+        candidates.push({ from:f, to:t, condition:cond });
+      }
+    });
+  });
+  Object.values(selectedJoins).forEach(j=>{ if(!candidates.some(c=>c.from===j.from && c.to===j.to)) candidates.push({ from:j.from, to:j.to, condition:j.condition }); });
+  if(candidates.length===0){ possibleJoinsContainer.innerHTML = '<div class="kv">No related joins found for current selection.</div>'; return; }
+  candidates.sort((a,b)=> (titleCaseName(a.from) + '|' + titleCaseName(a.to)).localeCompare(titleCaseName(b.from) + '|' + titleCaseName(b.to)));
+  candidates.forEach(j=>{
+    const key = `${j.from}-${j.to}`;
+    const row = document.createElement('div');
+    row.style.display='flex'; row.style.justifyContent='space-between'; row.style.alignItems='center'; row.style.padding='8px'; row.style.border='1px solid rgba(255,255,255,0.03)'; row.style.borderRadius='8px'; row.style.marginBottom='6px';
+    const left = document.createElement('div'); left.innerHTML = `<div style="font-weight:700">${titleCaseName(j.from)} → ${titleCaseName(j.to)}</div><div class="kv" style="font-size:12px">${j.condition}</div>`;
+    const right = document.createElement('div');
+    const chk = document.createElement('input'); chk.type='checkbox'; chk.checked = !!selectedJoins[key]; chk.style.transform='scale(1.15)';
+    chk.addEventListener('change', ()=>{
+      if(chk.checked){
+        selectedJoins[key] = { from:j.from, to:j.to, condition:j.condition };
+        if(!selectedTables[j.from]) selectedTables[j.from] = { isStar:false, columns:[] };
+        if(!selectedTables[j.to]) selectedTables[j.to] = { isStar:false, columns:[] };
+      } else {
+        delete selectedJoins[key];
+      }
+      rerender();
+    });
+    right.appendChild(chk);
+    row.appendChild(left); row.appendChild(right);
+    possibleJoinsContainer.appendChild(row);
+  });
+}
+
+/* WHERE builder */
+function renderWhere(){
+  whereContainer.innerHTML = '';
+  const avail = getAvailableColumns();
+  whereClauses.forEach((w, idx)=>{
+    const row = document.createElement('div'); row.style.display='flex'; row.style.gap='8px'; row.style.marginTop='8px'; row.style.alignItems='center';
+    const opType = document.createElement('select'); opType.className='search-input'; opType.style.width='90px'; opType.innerHTML = '<option>AND</option><option>OR</option>'; opType.value = w.opType || 'AND';
+    const colSel = document.createElement('select'); colSel.className='search-input'; colSel.style.flex='1';
+    avail.forEach(a=>{ const o=document.createElement('option'); o.value=`${a.table}.${a.name}`; o.textContent=`[${titleCaseName(a.table)}].[${a.name}]`; if(a.table===w.table && a.name===w.column) o.selected=true; colSel.appendChild(o); });
+    const opSel = document.createElement('select'); opSel.className='search-input'; opSel.style.width='110px'; opSel.innerHTML = '<option>=</option><option>!=</option><option>></option><option><</option><option>LIKE</option>'; opSel.value = w.operator || '=';
+    const val = document.createElement('input'); val.className='search-input'; val.style.width='160px'; val.value = w.value || '';
+    const rem = document.createElement('button'); rem.className='btn-ghost'; rem.textContent='Remove'; rem.addEventListener('click', ()=>{ whereClauses.splice(idx,1); renderWhere(); generateSQL(); });
+    opType.addEventListener('change', ()=>{ w.opType = opType.value; generateSQL(); });
+    colSel.addEventListener('change', ()=>{ const [t,c] = colSel.value.split('.'); w.table=t; w.column=c; generateSQL(); });
+    opSel.addEventListener('change', ()=>{ w.operator = opSel.value; generateSQL(); });
+    val.addEventListener('input', ()=>{ w.value = val.value; generateSQL(); });
+    row.appendChild(opType); row.appendChild(colSel); row.appendChild(opSel); row.appendChild(val); row.appendChild(rem);
+    whereContainer.appendChild(row);
+  });
+}
+
+/* Aggregates UI */
+function updateAggColumns(){
+  const avail = getAvailableColumns();
+  aggCol.innerHTML = '<option value="">-- select column --</option>';
+  avail.forEach(a=>{ const o=document.createElement('option'); o.value=`${a.table}.${a.name}`; o.textContent=`[${titleCaseName(a.table)}].[${a.name}]`; aggCol.appendChild(o); });
+  groupBySel.innerHTML = '';
+  avail.forEach(a=>{ const o=document.createElement('option'); o.value=`${a.table}.${a.name}`; o.textContent=`[${titleCaseName(a.table)}].[${a.name}]`; groupBySel.appendChild(o); });
+}
+function renderAggregates(){ aggList.innerHTML = ''; aggregates.forEach((ag, idx)=>{ const li=document.createElement('li'); li.innerHTML = `${ag.func}(${ag.column?`[${titleCaseName(ag.table)}].[${ag.column}]`:'*'}) AS ${ag.alias} <button class="btn-ghost" style="margin-left:8px">Remove</button>`; li.querySelector('button').addEventListener('click', ()=>{ aggregates.splice(idx,1); generateSQL(); }); aggList.appendChild(li); }); }
+
+/* Generate SQL */
+function generateSQL(){
+  const selectParts = [];
+  aggregates.forEach(a=>{ const colExpr = a.column ? `[${a.table}].[${a.column}]` : '*'; selectParts.push(`${a.func}(${colExpr}) AS ${a.alias}`); });
+
+  Object.entries(selectedTables).forEach(([t,info])=>{
+    if(info.isStar) selectParts.push(`[${t}].*`);
+    else info.columns.forEach(c=> selectParts.push(`[${t}].[${c}]`));
+  });
+
+  if(selectParts.length === 0){ sqlOutput.value = ''; renderPossibleJoins(); renderMermaid(); return; }
+
+  const selTbls = Object.keys(selectedTables);
+  let fromTable = selTbls.includes('Faults') ? 'Faults' : (selTbls[0] || (Object.values(selectedJoins)[0] && Object.values(selectedJoins)[0].from));
+  if(!fromTable){ sqlOutput.value=''; renderPossibleJoins(); renderMermaid(); return; }
+
+  let q = `SELECT\n    ${selectParts.join(',\n    ')}\nFROM [${fromTable}]`;
+
+  Object.values(selectedJoins).forEach(j=>{
+    q += `\n    INNER JOIN [${j.to}] ON ${j.condition}`;
+  });
+
+  const allInQuery = new Set(getAllTablesInQuery());
+  const whereParts = [];
+
+  if(allInQuery.has('Faults')) whereParts.push(`[Faults].[fdeleted] = 0`);
+
+  if(requestType !== 'All'){
+    const ids = requestTypeMap[requestType] || [];
+    if(ids.length){
+      if(allInQuery.has('Faults')) whereParts.push(`AND [Faults].[RequestTypeNew] IN (${ids.join(', ')})`);
+      else whereParts.push(`[Faults].[RequestTypeNew] IN (${ids.join(', ')})`);
+    }
+  }
+
+  whereClauses.forEach((w, idx)=>{
+    const part = `[${w.table}].[${w.column}] ${w.operator} '${sanitizeSQLValue(w.value)}'`;
+    if(idx === 0 && whereParts.length === 0) whereParts.push(part);
+    else whereParts.push(`${w.opType || 'AND'} ${part}`);
+  });
+
+  if(whereParts.length){
+    let partsCopy = whereParts.slice();
+    if(partsCopy.length === 1 && /^\s*AND\s+/i.test(partsCopy[0])) partsCopy[0] = partsCopy[0].replace(/^\s*AND\s+/i,'');
+    q += `\nWHERE ${partsCopy.join('\n    ')}`;
+  }
+
+  if(groupBy.length){
+    const gb = groupBy.map(g => `[${g.table}].[${g.name}]`).join(', ');
+    q += `\nGROUP BY\n    ${gb}`;
+  }
+
+  sqlOutput.value = q;
+  renderPossibleJoins();
+  renderMermaid();
+}
+
+/* Render mermaid visualiser (empty until a table or join selected) */
+
+/* Enhanced colourful renderMermaid */
+function renderMermaid(){
+  mermaidArea.innerHTML = '<div class="kv">Rendering...</div>';
+  const nodes = new Set();
+  const edges = [];
+  const activeJoins = Object.keys(selectedJoins).length ? Object.values(selectedJoins) : [];
+
+  const hasTablesSelected = Object.keys(selectedTables).length > 0;
+  if(!hasTablesSelected && activeJoins.length === 0){
+    mermaidArea.innerHTML = '<div class="kv">Select a table to render the Visualiser.</div>';
+    return;
+  }
+
+  if(activeJoins.length){
+    activeJoins.forEach(j=>{ nodes.add(j.from); nodes.add(j.to); edges.push({ from:j.from, to:j.to, cond:j.condition }); });
+  } else {
+    // show only selected tables (no joins)
+    Object.keys(selectedTables).forEach(t=>nodes.add(t));
+  }
+  Object.keys(selectedTables).forEach(t=>nodes.add(t));
+
+  const palette = ['#22d3ee','#a855f7','#ef4444','#10b981','#facc15','#6366f1','#fb923c','#14b8a6'];
+  function colorFor(name) {
+    let hash = 0;
+    for (let i=0;i<name.length;i++) hash = name.charCodeAt(i) + ((hash<<5)-hash);
+    return palette[Math.abs(hash) % palette.length];
+  }
+
+  // base md with classDef for rounded boxes and default styling
+  let md = 'flowchart LR\n';
+  md += 'classDef default fill:#1e293b,stroke:#00ff87,stroke-width:2px,rx:10,ry:10,stroke-dasharray:none;\n';
+
+  // nodes
+  nodes.forEach(n=>{
+    const id = safeId(n);
+    const label = (tables[n] && tables[n].displayName) ? `${safeLabel(tables[n].displayName)}` : safeLabel(n);
+    // use a class per node so we can style each individually
+    md += `  ${id}["${label}"]:::${id}\n`;
+  });
+
+  // edges
+  edges.forEach(e=>{
+    const sf = safeId(e.from), st = safeId(e.to);
+    const lbl = safeLabel(e.cond || '');
+    if(lbl) md += `  ${sf} -->|\"${lbl}\"| ${st}\n`;
+    else md += `  ${sf} --> ${st}\n`;
+  });
+
+  // per-node classes with fill color
+  nodes.forEach(n => {
+    const color = colorFor(n);
+    // darker stroke for contrast
+    md += `  class ${safeId(n)} fill:${color},stroke:#0f172a,stroke-width:2px;\n`;
+  });
+
+  // colored link styles
+  edges.forEach((e,i)=>{
+    const color = palette[i % palette.length];
+    md += `  linkStyle ${i} stroke:${color},stroke-width:2px;\n`;
+  });
+
+  try{
+    mermaid.initialize({
+      startOnLoad:false,
+      theme: document.body.classList.contains('light') ? 'default' : 'dark',
+      themeVariables: {
+        primaryColor: '#0ea5e9',
+        primaryTextColor: document.body.classList.contains('light') ? '#071022' : '#ffffff',
+        lineColor: '#34d399',
+        secondaryColor: '#1e293b',
+        tertiaryColor: '#22c55e',
+        edgeLabelBackground: document.body.classList.contains('light') ? '#ffffff' : '#0f172a',
+        clusterBkg: document.body.classList.contains('light') ? '#f8fafc' : '#0e1720'
+      }
+    });
+    const rid = 'm' + Date.now().toString(36);
+    mermaid.render(rid, md).then(({svg})=>{
+      mermaidArea.innerHTML = svg;
+      const svgEl = mermaidArea.querySelector('svg');
+      if(svgEl){
+        svgEl.style.width='100%';
+        svgEl.style.height='auto';
+        svgEl.setAttribute('xmlns','http://www.w3.org/2000/svg');
+        // ensure text contrast in light mode
+        if(document.body.classList.contains('light')){
+          svgEl.querySelectorAll('text').forEach(t => t.setAttribute('fill','#071022'));
+        } else {
+          svgEl.querySelectorAll('text').forEach(t => t.setAttribute('fill','#ffffff'));
+        }
+      }
+    }).catch(err=>{
+      mermaidArea.innerHTML = `<div class="kv">Visualiser parse error: ${String(err.message || err)}</div>`;
+      console.error('Mermaid error', err);
+    });
+  }catch(e){
+    mermaidArea.innerHTML = `<div class="kv">Visualiser render exception: ${String(e.message || e)}</div>`;
+    console.error(e);
+  }
+}
+
+/* Export Visualiser to PNG (SVG -> canvas -> blob) */
+function exportVisualiserToPNG(){
+  const svgEl = mermaidArea.querySelector('svg');
+  if(!svgEl){ alert('No visualiser SVG found to export.'); return; }
+  try{
+    const clone = svgEl.cloneNode(true);
+    if(!clone.getAttribute('xmlns')) clone.setAttribute('xmlns','http://www.w3.org/2000/svg');
+    const width = clone.getAttribute('width') || (clone.viewBox && clone.viewBox.baseVal && clone.viewBox.baseVal.width) || 1200;
+    const height = clone.getAttribute('height') || (clone.viewBox && clone.viewBox.baseVal && clone.viewBox.baseVal.height) || 800;
+    clone.setAttribute('width', width);
+    clone.setAttribute('height', height);
+    if(document.body.classList.contains('light')){
+      const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      rect.setAttribute('width','100%'); rect.setAttribute('height','100%'); rect.setAttribute('fill','#ffffff');
+      clone.insertBefore(rect, clone.firstChild);
+    }
+    const serializer = new XMLSerializer();
+    let svgStr = serializer.serializeToString(clone);
+    if(!svgStr.startsWith('<?xml')) svgStr = '<?xml version="1.0" encoding="UTF-8"?>\n' + svgStr;
+    const encoded = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
+    const img = new Image();
+    img.onload = function(){
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width; canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if(document.body.classList.contains('light')){ ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height); }
+      ctx.drawImage(img,0,0);
+      canvas.toBlob(function(blob){
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'halo-visualiser.png';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(a.href);
+      }, 'image/png');
+    };
+    img.onerror = function(e){ alert('Failed to render visualiser to PNG: ' + e); };
+    img.src = encoded;
+  } catch(err){
+    alert('Export failed: ' + err.message);
+    console.error(err);
+  }
+}
+
+/* Rerender helper */
+function rerender(){ updateAggColumns(); renderWhere(); renderAggregates(); generateSQL(); }
+
+/* Init wiring */
+document.addEventListener('DOMContentLoaded', ()=>{
+  renderSchema();
+  updateAggColumns();
+  renderPossibleJoins();
+  generateSQL();
+  schemaLoading.style.display = 'none';
+
+  tableSearch.addEventListener('input', (e)=> renderSchema(e.target.value));
+
+  expandCollapseBtn.addEventListener('click', ()=>{
+    const expanding = expandCollapseBtn.textContent === 'Expand All';
+    document.querySelectorAll('.table-fields').forEach(tf=> tf.style.display = expanding ? 'block' : 'none');
+    expandCollapseBtn.textContent = expanding ? 'Collapse All' : 'Expand All';
+  });
+
+  addWhereBtn.addEventListener('click', ()=>{
+    const avail = getAvailableColumns();
+    if(avail.length===0){ alert('Please add/select a table before adding WHERE conditions.'); return; }
+    const first = avail[0];
+    whereClauses.push({ table:first.table, column:first.name, operator:'=', value:'', opType:'AND' });
+    renderWhere(); generateSQL();
+  });
+
+  addAggBtn.addEventListener('click', ()=>{
+    const f = aggFunc.value; const cv = aggCol.value;
+    if(!f){ alert('Select an aggregate function'); return; }
+    const [t,c] = cv.split('.') || [null,null];
+    const alias = `${f.toLowerCase()}_${c || 'col'}`;
+    aggregates.push({ func:f, table:t, column:c, alias });
+    renderAggregates(); generateSQL();
+  });
+
+  groupBySel.addEventListener('change', ()=> { groupBy = Array.from(groupBySel.selectedOptions).map(o=>{ const [t,c] = o.value.split('.'); return { table:t, name:c }; }); generateSQL(); });
+
+  copyBtn.addEventListener('click', async ()=>{
+    const txt = sqlOutput.value.trim();
+    if(!txt){ alert('No SQL to copy'); return; }
+    try{ await navigator.clipboard.writeText(txt); copyBtn.textContent = 'Copied ✓'; setTimeout(()=> copyBtn.textContent='Copy',900); } catch(e){ alert('Copy failed: ' + e.message); }
+  });
+
+  exportBtn.addEventListener('click', ()=>{
+    const txt = sqlOutput.value.trim();
+    if(!txt){ alert('No SQL to export'); return; }
+    const blob = new Blob([txt], { type:'text/sql;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'query.sql'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  });
+
+  clearBtn.addEventListener('click', ()=>{
+    if(!confirm('Clear query and selections?')) return;
+    selectedTables = {}; selectedJoins = {}; whereClauses = []; aggregates = []; groupBy = []; requestType = 'All'; requestTypeSel.value='All';
+    renderSchema(); renderPossibleJoins(); rerender();
+  });
+
+  refreshVisualiserBtn.addEventListener('click', renderMermaid);
+  exportVisualiserPngBtn.addEventListener('click', exportVisualiserToPNG);
+
+  toggleVisualiserBtn.addEventListener('click', ()=>{
+    const panel = document.getElementById('visualiser-panel');
+    const hidden = panel.style.display === 'none';
+    panel.style.display = hidden ? 'block' : 'none';
+    toggleVisualiserBtn.textContent = hidden ? 'Hide Visualiser' : 'Show Visualiser';
+  });
+
+  // Initialize theme (persisted) and set button icon
+  (function(){
+    const savedTheme = localStorage.getItem('halo_theme');
+    const isLight = savedTheme === 'light';
+    if(isLight) document.body.classList.add('light');
+    themeToggle.textContent = isLight ? '🌞' : '🌙';
+    // Apply input styling to match theme on load
+    document.querySelectorAll('.search-input').forEach(el=>{
+      if(document.body.classList.contains('light')){ el.style.background='#fff'; el.style.color='var(--light-text)'; el.style.border='1px solid rgba(11,17,32,0.06)'; }
+      else { el.style.background='rgba(255,255,255,0.02)'; el.style.color=''; el.style.border='1px solid rgba(255,255,255,0.03)'; }
+    });
+  })();
+
+  themeToggle.addEventListener('click', ()=>{
+    const isLight = document.body.classList.toggle('light');
+    localStorage.setItem('halo_theme', isLight ? 'light' : 'dark');
+    themeToggle.textContent = isLight ? '🌞' : '🌙';
+    // re-render mermaid to pick up theme
+    try{ if(typeof renderMermaid === 'function') renderMermaid(); }catch(e){console.warn('renderMermaid failed on theme toggle', e);} 
+    // update input styles
+    document.querySelectorAll('.search-input').forEach(el=>{
+      if(document.body.classList.contains('light')){ el.style.background='#fff'; el.style.color='var(--light-text)'; el.style.border='1px solid rgba(11,17,32,0.06)'; }
+      else { el.style.background='rgba(255,255,255,0.02)'; el.style.color=''; el.style.border='1px solid rgba(255,255,255,0.03)'; }
+    });
+  });
+
+  schemaArea.addEventListener('change', (e)=>{
+    if(e.target && e.target.matches('input[type="checkbox"]')){
+      const t = e.target.dataset.table, f = e.target.dataset.field;
+      if(!t || !f) return;
+      if(!selectedTables[t]) selectedTables[t] = { isStar:false, columns: [] };
+      if(e.target.checked){
+        if(!selectedTables[t].columns.includes(f)) selectedTables[t].columns.push(f);
+      } else {
+        selectedTables[t].columns = selectedTables[t].columns.filter(x=>x!==f);
+        if(selectedTables[t].columns.length===0 && !selectedTables[t].isStar) delete selectedTables[t];
+      }
+      rerender();
+    }
+  });
+
+  customJoinTable1.innerHTML = Object.keys(tables).sort((a,b)=> titleCaseName(a).localeCompare(titleCaseName(b))).map(n=>`<option value="${n}">${titleCaseName(n)}</option>`).join('');
+  customJoinTable2.innerHTML = customJoinTable1.innerHTML;
+
+  addJoinBtn.addEventListener('click', ()=>{
+    const t1 = customJoinTable1.value, t2 = customJoinTable2.value, cond = customJoinCondition.value.trim();
+    if(!t1 || !t2 || !cond){ alert('Please pick two tables and a condition'); return; }
+    const key = `${t1}-${t2}`;
+    selectedJoins[key] = { from:t1, to:t2, condition:cond };
+    if(!selectedTables[t1]) selectedTables[t1] = { isStar:false, columns:[] };
+    if(!selectedTables[t2]) selectedTables[t2] = { isStar:false, columns:[] };
+    customJoinCondition.value='';
+    rerender();
+  });
+
+  requestTypeSel.addEventListener('change', (e)=>{ requestType = e.target.value || 'All'; generateSQL(); });
+});
+
+/* debugging helpers */
+window._hn_getTables = ()=>Object.keys(tables).sort();
+window._hn_getJoinMap = ()=>JSON.parse(JSON.stringify(joinMap || JOINMAP));
+
+
+
+
+
+
+
+
+
+
+
+
+/* -------- Collapsible Panels v11 (pure JS instant toggle, stable) -------- */
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.panel').forEach(panel => {
+    if (panel.querySelector('#schema-area')) return; // skip schema panel
+
+    // Find the header (h3 or h4)
+    const header = panel.querySelector('h3, h4');
+    if (!header) return;
+
+    // Create gradient green button
+    const btn = document.createElement('button');
+    btn.className = 'collapse-toggle';
+    btn.textContent = '−';
+    btn.setAttribute('aria-expanded', 'true');
+
+    // Insert button at the beginning of header
+    header.prepend(btn);
+
+    // Determine all elements inside panel after the header (to toggle)
+    const allChildren = Array.from(panel.children);
+    const indexOfHeader = allChildren.findIndex(c => c.contains(header));
+    const toToggle = allChildren.slice(indexOfHeader + 1);
+
+    // Click event: toggle those elements only
+    btn.addEventListener('click', () => {
+      const collapsed = btn.textContent === '−';
+      btn.textContent = collapsed ? '+' : '−';
+      btn.setAttribute('aria-expanded', String(!collapsed));
+
+      toToggle.forEach(el => {
+        el.style.display = collapsed ? 'none' : '';
+      });
+
+      // Re-render Visualiser when expanding
+      if (!collapsed && panel.querySelector('#mermaid-area')) {
+        setTimeout(() => {
+          if (typeof renderMermaid === 'function') {
+            try { renderMermaid(); } catch(e) { console.warn('Mermaid re-render failed', e); }
+          }
+        }, 100);
+      }
+    });
+  });
+
+  /* Special case: Possible Joins collapsible */
+  const pjWrapper = document.getElementById('possible-joins-wrapper');
+  if (pjWrapper) {
+    const pjHeader = pjWrapper.querySelector('h4');
+    if (pjHeader) {
+      const btn = document.createElement('button');
+      btn.className = 'collapse-toggle';
+      btn.textContent = '−';
+      pjHeader.prepend(btn);
+
+      // Find siblings after header to toggle
+      const children = Array.from(pjWrapper.children);
+      const headerIndex = children.indexOf(pjHeader);
+      const toToggle = children.slice(headerIndex + 1);
+
+      btn.addEventListener('click', () => {
+        const collapsed = btn.textContent === '−';
+        btn.textContent = collapsed ? '+' : '−';
+        toToggle.forEach(el => {
+          el.style.display = collapsed ? 'none' : '';
+        });
+      });
+    }
+  }
+});
+
+</script>
+</body>
+</html>
